@@ -54,14 +54,28 @@ type FetchLocationPayload = {
 };
 
 async function fetchLocations(
-  _payload: FetchLocationPayload
+  payload: FetchLocationPayload
 ): Promise<PlacePin[]> {
-  console.log(_payload);
   await new Promise((resolve) => setTimeout(resolve, 200));
   if (mockFetchCursor >= MOCK_PIN_FEED.length) return [];
   const nextPins = MOCK_PIN_FEED.slice(mockFetchCursor, mockFetchCursor + 5);
+  const latitude = payload.position?.lat ?? 0;
+  const longitude = payload.position?.lng ?? 0;
+  const headingNormalized = payload.headingNormalized ?? 0;
+  const headingDegrees = headingNormalized * 360;
+
+  const enrichedPins = nextPins.map((pin) => ({
+    ...pin,
+    position: {
+      lat: latitude,
+      lng: longitude,
+    },
+    headingDegrees,
+    headingNormalized,
+  }));
+
   mockFetchCursor += nextPins.length;
-  return nextPins;
+  return enrichedPins;
 }
 
 function resetMockLocationFeed() {
@@ -387,6 +401,13 @@ export default function MapScreen() {
                       <div className="text-sm font-medium">{p.name}</div>
                       <div className="text-xs text-neutral-300">
                         {p.category ?? "Place"}
+                      </div>
+                      <div>
+                        Debug: <br />
+                        Heading Degrees: {p.headingDegrees} <br />
+                        Heading Normalized: {p.headingNormalized} <br />
+                        Longitude: {p.position.lng} <br />
+                        Latitude: {p.position.lat} <br />
                       </div>
                       {isHighlighted && (
                         <div className="mt-2 text-xs font-semibold text-emerald-300">

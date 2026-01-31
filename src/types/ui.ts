@@ -5,4 +5,6 @@ export type PlacePin = {
   name: string;
   position: LatLng;
   category?: string;
+  headingDegrees?: number;
+  headingNormalized?: number;
 };
