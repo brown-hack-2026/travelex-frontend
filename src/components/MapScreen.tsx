@@ -551,7 +551,7 @@ export default function MapScreen() {
 
       if (cancelled) return;
       orientationHandler = (rawEvent: Event) => {
-        console.log(rawEvent);
+        console.error(rawEvent);
         const event = rawEvent as DeviceOrientationEvent;
         if (typeof event.alpha !== "number") return;
         const normalized = normalizeHeadingUnit(event.alpha);
