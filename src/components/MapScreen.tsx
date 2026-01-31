@@ -53,29 +53,12 @@ type FetchLocationPayload = {
   headingNormalized: number | null;
 };
 
-async function fetchLocations(
-  payload: FetchLocationPayload
-): Promise<PlacePin[]> {
+async function fetchLocations(_payload: FetchLocationPayload): Promise<PlacePin[]> {
   await new Promise((resolve) => setTimeout(resolve, 200));
   if (mockFetchCursor >= MOCK_PIN_FEED.length) return [];
   const nextPins = MOCK_PIN_FEED.slice(mockFetchCursor, mockFetchCursor + 5);
-  const latitude = payload.position?.lat ?? 0;
-  const longitude = payload.position?.lng ?? 0;
-  const headingNormalized = payload.headingNormalized ?? 0;
-  const headingDegrees = headingNormalized * 360;
-
-  const enrichedPins = nextPins.map((pin) => ({
-    ...pin,
-    position: {
-      lat: latitude,
-      lng: longitude,
-    },
-    headingDegrees,
-    headingNormalized,
-  }));
-
   mockFetchCursor += nextPins.length;
-  return enrichedPins;
+  return nextPins;
 }
 
 function resetMockLocationFeed() {
@@ -146,6 +129,13 @@ export default function MapScreen() {
   const fallbackHeadingRef = useRef<number | null>(null);
   const positionRef = useRef<GeoPoint | null>(null);
   const headingNormalizedRef = useRef<number | null>(null);
+
+  const latitudeDisplay = currentPosition ? currentPosition.lat.toFixed(5) : "—";
+  const longitudeDisplay = currentPosition ? currentPosition.lng.toFixed(5) : "—";
+  const headingDegreesDisplay =
+    currentHeadingNormalized != null ? `${Math.round(currentHeadingNormalized * 360)}°` : "—";
+  const headingNormalizedDisplay =
+    currentHeadingNormalized != null ? currentHeadingNormalized.toFixed(2) : "—";
 
   async function onStart() {
     setBusy(true);
@@ -312,7 +302,7 @@ export default function MapScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    let orientationHandler: ((ev: Event) => void) | null = null;
+    let orientationHandler: EventListener | null = null;
 
     async function setupOrientationListener() {
       if (typeof window === "undefined") return;
@@ -333,8 +323,8 @@ export default function MapScreen() {
       }
 
       if (cancelled) return;
-      orientationHandler = (ev: Event) => {
-        const event = ev as DeviceOrientationEvent;
+      orientationHandler = (rawEvent: Event) => {
+        const event = rawEvent as DeviceOrientationEvent;
         if (typeof event.alpha !== "number") return;
         const normalized = normalizeHeadingUnit(event.alpha);
         fallbackHeadingRef.current = normalized;
@@ -378,6 +368,32 @@ export default function MapScreen() {
                 highlights for 10 seconds while the session is active.
               </p>
             </div>
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4 text-sm">
+              <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-400">
+                Live heading &amp; position
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-4 font-mono text-white/90 sm:grid-cols-4">
+                <div>
+                  <div className="text-[10px] uppercase text-neutral-500 tracking-widest">Latitude</div>
+                  <div className="text-base text-white">{latitudeDisplay}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase text-neutral-500 tracking-widest">Longitude</div>
+                  <div className="text-base text-white">{longitudeDisplay}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase text-neutral-500 tracking-widest">Heading (deg)</div>
+                  <div className="text-base text-white">{headingDegreesDisplay}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase text-neutral-500 tracking-widest">Heading (0-1)</div>
+                  <div className="text-base text-white">{headingNormalizedDisplay}</div>
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-neutral-400">
+                Values refresh automatically from geolocation + device orientation permissions.
+              </p>
+            </div>
             {pins.length === 0 ? (
               <div className="flex flex-1 items-center justify-center rounded-3xl border border-dashed border-white/20 p-8 text-center text-sm text-neutral-300">
                 Pins will appear once the active session begins streaming new
@@ -401,13 +417,6 @@ export default function MapScreen() {
                       <div className="text-sm font-medium">{p.name}</div>
                       <div className="text-xs text-neutral-300">
                         {p.category ?? "Place"}
-                      </div>
-                      <div>
-                        Debug: <br />
-                        Heading Degrees: {p.headingDegrees} <br />
-                        Heading Normalized: {p.headingNormalized} <br />
-                        Longitude: {p.position.lng} <br />
-                        Latitude: {p.position.lat} <br />
                       </div>
                       {isHighlighted && (
                         <div className="mt-2 text-xs font-semibold text-emerald-300">
