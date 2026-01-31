@@ -7,18 +7,14 @@ export default function PlaceSheet({
   place,
   sessionActive,
   busy,
-  guideText,
   onClose,
-  onGuide,
   onTakePhoto,
 }: {
   open: boolean;
   place: PlacePin | null;
   sessionActive: boolean;
   busy: boolean;
-  guideText: string;
   onClose: () => void;
-  onGuide: () => void;
   onTakePhoto: () => void;
 }) {
   if (!open || !place) return null;
@@ -43,32 +39,18 @@ export default function PlaceSheet({
 
             {!sessionActive && (
               <div className="mt-3 text-xs text-amber-200 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3">
-                Start a session to enable Guide + Photo.
+                Start a session to enable photo capture.
               </div>
             )}
 
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <button
-                disabled={!sessionActive || busy}
-                onClick={onGuide}
-                className="rounded-2xl py-3 bg-white text-neutral-950 font-medium disabled:opacity-50 active:scale-[0.99]"
-              >
-                Guide me
-              </button>
+            <div className="mt-4">
               <button
                 disabled={!sessionActive || busy}
                 onClick={onTakePhoto}
-                className="rounded-2xl py-3 bg-white/10 border border-white/15 font-medium disabled:opacity-50 active:scale-[0.99]"
+                className="w-full rounded-2xl py-3 bg-white/10 border border-white/15 font-medium disabled:opacity-50 active:scale-[0.99]"
               >
                 Take photo
               </button>
-            </div>
-
-            <div className="mt-4">
-              <div className="text-xs text-neutral-400 mb-2">Guide</div>
-              <div className="rounded-2xl bg-black/30 border border-white/10 p-3 text-sm text-neutral-200 min-h-[64px]">
-                {busy ? "Thinking…" : guideText || "Tap “Guide me” to get an audio summary (stub for now)."}
-              </div>
             </div>
           </div>
 
