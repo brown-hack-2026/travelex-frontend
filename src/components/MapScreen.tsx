@@ -1,16 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PlacePin } from "@/types/ui";
 import { startSession, endSession, uploadPhoto } from "@/lib/api";
 import TopBar from "@/components/TopBar";
 import SessionBar from "@/components/SessionBar";
 import PlaceSheet from "@/components/PlaceSheet";
 import WrappedPreview from "@/components/WrappedPreview";
+import { createAudioStreamFromText } from "@/utils/elevenlabs";
 
 type GeoPoint = {
   lat: number;
   lng: number;
+};
+
+type AudioQueueItem = {
+  text: string;
+  onComplete?: () => void;
 };
 
 const MOCK_PIN_FEED: PlacePin[] = [
@@ -72,7 +78,7 @@ type SessionState =
   | { status: "ACTIVE"; sessionId: string; startedAt: number }
   | { status: "ENDED"; recapId: string };
 
-const MOVEMENT_THRESHOLD_METERS = 1;
+const MOVEMENT_THRESHOLD_METERS = 3;
 const EARTH_RADIUS_METERS = 6_371_000;
 
 function toRadians(degrees: number) {
@@ -125,12 +131,20 @@ export default function MapScreen() {
   const [currentHeadingNormalized, setCurrentHeadingNormalized] = useState<
     number | null
   >(null);
+  const [audioSessionActive, setAudioSessionActive] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const lastRawPositionRef = useRef<GeoPoint | null>(null);
   const fallbackHeadingRef = useRef<number | null>(null);
   const positionRef = useRef<GeoPoint | null>(null);
   const headingNormalizedRef = useRef<number | null>(null);
+  const lastSpokenHighlightRef = useRef<string | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const audioChunksQueueRef = useRef<AudioQueueItem[]>([]);
+  const processingAudioRef = useRef(false);
+  const pinsRef = useRef<PlacePin[]>([]);
+  const awaitingNextPinRef = useRef(false);
 
   const latitudeDisplay = currentPosition
     ? currentPosition.lat.toFixed(5)
@@ -154,6 +168,7 @@ export default function MapScreen() {
       resetMockLocationFeed();
       setPins([]);
       setHighlightIndex(null);
+      awaitingNextPinRef.current = false;
       setSession({
         status: "ACTIVE",
         sessionId: res.sessionId,
@@ -201,6 +216,111 @@ export default function MapScreen() {
   }, [currentHeadingNormalized]);
 
   useEffect(() => {
+    pinsRef.current = pins;
+  }, [pins]);
+
+  const ensureAudioContext = useCallback(() => {
+    if (typeof window === "undefined") return null;
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return null;
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioCtx();
+    }
+    if (audioContextRef.current.state === "suspended") {
+      audioContextRef.current.resume();
+    }
+    return audioContextRef.current;
+  }, []);
+
+  const playBufferedAudio = useCallback(async () => {
+    if (processingAudioRef.current) return;
+    processingAudioRef.current = true;
+    try {
+      const context = ensureAudioContext();
+      if (!context) return;
+      while (audioChunksQueueRef.current.length > 0) {
+        const item = audioChunksQueueRef.current.shift();
+        if (!item) continue;
+        const stream = await createAudioStreamFromText(item.text);
+        const reader = stream.getReader();
+        const chunks: Uint8Array[] = [];
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) chunks.push(value);
+        }
+        const audioData = new Uint8Array(
+          chunks.reduce((acc, value) => acc + value.length, 0)
+        );
+        let offset = 0;
+        for (const chunk of chunks) {
+          audioData.set(chunk, offset);
+          offset += chunk.length;
+        }
+        const audioBuffer = await context.decodeAudioData(audioData.buffer);
+        const source = context.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(context.destination);
+        audioSourceRef.current = source;
+        await new Promise<void>((resolve) => {
+          source.onended = () => {
+            resolve();
+          };
+          source.start();
+        });
+        item.onComplete?.();
+      }
+    } catch (error) {
+      console.error("Failed to play audio chunk", error);
+    } finally {
+      processingAudioRef.current = false;
+    }
+  }, [ensureAudioContext]);
+
+  const queueElevenLabsAudio = useCallback(
+    (text: string, options?: { onComplete?: () => void }) => {
+      audioChunksQueueRef.current.push({
+        text,
+        onComplete: options?.onComplete,
+      });
+      playBufferedAudio();
+    },
+    [playBufferedAudio]
+  );
+
+  const cancelAudio = useCallback(() => {
+    audioChunksQueueRef.current = [];
+    if (audioSourceRef.current) {
+      try {
+        audioSourceRef.current.stop();
+      } catch {
+        // ignore errors when stopping already stopped nodes
+      }
+      audioSourceRef.current.disconnect();
+      audioSourceRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+    processingAudioRef.current = false;
+    awaitingNextPinRef.current = false;
+  }, []);
+
+  const handleHighlightAudioComplete = useCallback((completedIndex: number) => {
+    setHighlightIndex((prev) => {
+      if (prev !== completedIndex) return prev;
+      const nextIndex = completedIndex + 1;
+      if (nextIndex < pinsRef.current.length) {
+        awaitingNextPinRef.current = false;
+        return nextIndex;
+      }
+      awaitingNextPinRef.current = true;
+      return prev;
+    });
+  }, []);
+
+  useEffect(() => {
     if (session.status !== "ACTIVE") return;
 
     let cancelled = false;
@@ -225,6 +345,7 @@ export default function MapScreen() {
 
   useEffect(() => {
     if (session.status !== "ACTIVE") {
+      awaitingNextPinRef.current = false;
       setHighlightIndex(null);
       return;
     }
@@ -235,16 +356,16 @@ export default function MapScreen() {
 
   useEffect(() => {
     if (session.status !== "ACTIVE") return;
-    if (highlightIndex === null) return;
-    const hasNext = highlightIndex < pins.length - 1;
-    if (!hasNext) return;
-
-    const timeoutId = window.setTimeout(() => {
-      setHighlightIndex((prev) => (prev === null ? prev : prev + 1));
-    }, 10_000);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [session.status, highlightIndex, pins.length]);
+    if (!awaitingNextPinRef.current) return;
+    setHighlightIndex((prev) => {
+      if (prev === null) return prev;
+      if (prev < pins.length - 1) {
+        awaitingNextPinRef.current = false;
+        return prev + 1;
+      }
+      return prev;
+    });
+  }, [pins.length, session.status]);
 
   useEffect(() => {
     if (
@@ -364,6 +485,54 @@ export default function MapScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (session.status === "ACTIVE") {
+      setAudioSessionActive(true);
+      lastSpokenHighlightRef.current = null;
+    } else {
+      setAudioSessionActive(false);
+      lastSpokenHighlightRef.current = null;
+      cancelAudio();
+    }
+  }, [session.status, queueElevenLabsAudio, cancelAudio]);
+
+  useEffect(() => {
+    if (!audioSessionActive) return;
+    if (session.status !== "ACTIVE") return;
+    if (highlightIndex === null) return;
+    const pin = pins[highlightIndex];
+    if (!pin) return;
+
+    const highlightToken = `${session.status}-${pin.id}-${highlightIndex}`;
+    if (lastSpokenHighlightRef.current === highlightToken) return;
+    lastSpokenHighlightRef.current = highlightToken;
+
+    const lat = positionRef.current
+      ? positionRef.current.lat.toFixed(3)
+      : "unknown latitude";
+    const lng = positionRef.current
+      ? positionRef.current.lng.toFixed(3)
+      : "unknown longitude";
+    const headingDegrees =
+      headingNormalizedRef.current != null
+        ? `${Math.round(headingNormalizedRef.current * 360)} degrees`
+        : "unknown heading";
+
+    queueElevenLabsAudio(
+      `Spotlight now on ${pin.name}. Heading ${headingDegrees}. Approximate location latitude ${lat} and longitude ${lng}.`,
+      {
+        onComplete: () => handleHighlightAudioComplete(highlightIndex),
+      }
+    );
+  }, [
+    audioSessionActive,
+    session.status,
+    highlightIndex,
+    pins,
+    queueElevenLabsAudio,
+    handleHighlightAudioComplete,
+  ]);
+
   return (
     <div className="min-h-dvh bg-neutral-950 text-white">
       <TopBar />
@@ -374,8 +543,9 @@ export default function MapScreen() {
             <div className="space-y-2">
               <div className="text-lg font-semibold">Location Pins</div>
               <p className="text-sm text-neutral-300">
-                Session updates drop new pins every 30 seconds. Each pin
-                highlights for 10 seconds while the session is active.
+                Session updates drop new pins every 30 seconds. Each pin stays
+                spotlighted until its audio narration completes, then the next
+                available pin takes over.
               </p>
             </div>
             <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4 text-sm">
