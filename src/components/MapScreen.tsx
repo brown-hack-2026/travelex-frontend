@@ -53,7 +53,9 @@ type FetchLocationPayload = {
   headingNormalized: number | null;
 };
 
-async function fetchLocations(_payload: FetchLocationPayload): Promise<PlacePin[]> {
+async function fetchLocations(
+  _payload: FetchLocationPayload
+): Promise<PlacePin[]> {
   await new Promise((resolve) => setTimeout(resolve, 200));
   if (mockFetchCursor >= MOCK_PIN_FEED.length) return [];
   const nextPins = MOCK_PIN_FEED.slice(mockFetchCursor, mockFetchCursor + 5);
@@ -70,7 +72,7 @@ type SessionState =
   | { status: "ACTIVE"; sessionId: string; startedAt: number }
   | { status: "ENDED"; recapId: string };
 
-const MOVEMENT_THRESHOLD_METERS = 3;
+const MOVEMENT_THRESHOLD_METERS = 1;
 const EARTH_RADIUS_METERS = 6_371_000;
 
 function toRadians(degrees: number) {
@@ -130,12 +132,20 @@ export default function MapScreen() {
   const positionRef = useRef<GeoPoint | null>(null);
   const headingNormalizedRef = useRef<number | null>(null);
 
-  const latitudeDisplay = currentPosition ? currentPosition.lat.toFixed(5) : "—";
-  const longitudeDisplay = currentPosition ? currentPosition.lng.toFixed(5) : "—";
+  const latitudeDisplay = currentPosition
+    ? currentPosition.lat.toFixed(5)
+    : "—";
+  const longitudeDisplay = currentPosition
+    ? currentPosition.lng.toFixed(5)
+    : "—";
   const headingDegreesDisplay =
-    currentHeadingNormalized != null ? `${Math.round(currentHeadingNormalized * 360)}°` : "—";
+    currentHeadingNormalized != null
+      ? `${Math.round(currentHeadingNormalized * 360)}°`
+      : "—";
   const headingNormalizedDisplay =
-    currentHeadingNormalized != null ? currentHeadingNormalized.toFixed(2) : "—";
+    currentHeadingNormalized != null
+      ? currentHeadingNormalized.toFixed(2)
+      : "—";
 
   async function onStart() {
     setBusy(true);
@@ -374,24 +384,37 @@ export default function MapScreen() {
               </div>
               <div className="mt-3 grid grid-cols-2 gap-4 font-mono text-white/90 sm:grid-cols-4">
                 <div>
-                  <div className="text-[10px] uppercase text-neutral-500 tracking-widest">Latitude</div>
+                  <div className="text-[10px] uppercase text-neutral-500 tracking-widest">
+                    Latitude
+                  </div>
                   <div className="text-base text-white">{latitudeDisplay}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase text-neutral-500 tracking-widest">Longitude</div>
+                  <div className="text-[10px] uppercase text-neutral-500 tracking-widest">
+                    Longitude
+                  </div>
                   <div className="text-base text-white">{longitudeDisplay}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase text-neutral-500 tracking-widest">Heading (deg)</div>
-                  <div className="text-base text-white">{headingDegreesDisplay}</div>
+                  <div className="text-[10px] uppercase text-neutral-500 tracking-widest">
+                    Heading (deg)
+                  </div>
+                  <div className="text-base text-white">
+                    {headingDegreesDisplay}
+                  </div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase text-neutral-500 tracking-widest">Heading (0-1)</div>
-                  <div className="text-base text-white">{headingNormalizedDisplay}</div>
+                  <div className="text-[10px] uppercase text-neutral-500 tracking-widest">
+                    Heading (0-1)
+                  </div>
+                  <div className="text-base text-white">
+                    {headingNormalizedDisplay}
+                  </div>
                 </div>
               </div>
               <p className="mt-2 text-xs text-neutral-400">
-                Values refresh automatically from geolocation + device orientation permissions.
+                Values refresh automatically from geolocation + device
+                orientation permissions.
               </p>
             </div>
             {pins.length === 0 ? (
