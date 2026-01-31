@@ -222,6 +222,7 @@ export default function MapScreen() {
   const fallbackHeadingRef = useRef<number | null>(null);
   const positionRef = useRef<GeoPoint | null>(null);
   const headingNormalizedRef = useRef<number | null>(null);
+  const headingSourceRef = useRef<"gps" | "motion">("motion");
   const lastSpokenHighlightRef = useRef<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
@@ -255,6 +256,7 @@ export default function MapScreen() {
       setPins([]);
       setHighlightIndex(null);
       awaitingNextPinRef.current = false;
+      headingSourceRef.current = "motion";
       setSession({
         status: "ACTIVE",
         sessionId: res.sessionId,
@@ -490,12 +492,15 @@ export default function MapScreen() {
           (speed ?? 0) > 1
         ) {
           headingCandidate = normalizeHeadingUnit(heading);
+          headingSourceRef.current = "gps";
         } else if (lastPos && movedEnough) {
           headingCandidate = normalizeHeadingUnit(
             calculateBearing(lastPos, nextPos)
           );
+          headingSourceRef.current = "gps";
         } else if (fallbackHeadingRef.current != null) {
           headingCandidate = fallbackHeadingRef.current;
+          headingSourceRef.current = "motion";
         }
 
         if (headingCandidate != null) {
@@ -550,16 +555,18 @@ export default function MapScreen() {
         if (typeof event.alpha !== "number") return;
         const normalized = normalizeHeadingUnit(event.alpha);
         fallbackHeadingRef.current = normalized;
-        if (headingNormalizedRef.current == null) {
+        if (headingSourceRef.current !== "gps") {
           headingNormalizedRef.current = normalized;
-          setCurrentHeadingNormalized(normalized);
+          setCurrentHeadingNormalized((prev) =>
+            prev === normalized ? prev : normalized
+          );
         }
       };
-      window.addEventListener(
-        "deviceorientationabsolute",
-        orientationHandler,
-        true
-      );
+      const orientationEventName =
+        "ondeviceorientationabsolute" in window
+          ? "deviceorientationabsolute"
+          : "deviceorientation";
+      window.addEventListener(orientationEventName, orientationHandler, true);
     }
 
     setupOrientationListener();
@@ -567,8 +574,12 @@ export default function MapScreen() {
     return () => {
       cancelled = true;
       if (orientationHandler) {
+        const orientationEventName =
+          "ondeviceorientationabsolute" in window
+            ? "deviceorientationabsolute"
+            : "deviceorientation";
         window.removeEventListener(
-          "deviceorientationabsolute",
+          orientationEventName,
           orientationHandler,
           true
         );
