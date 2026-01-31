@@ -527,66 +527,63 @@ export default function MapScreen() {
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    let orientationHandler: EventListener | null = null;
+  const tearDownOrientationListener = useRef<(() => void) | null>(null);
 
-    async function setupOrientationListener() {
-      if (typeof window === "undefined") return;
-      const DeviceOrientation =
-        window.DeviceOrientationEvent as typeof DeviceOrientationEvent & {
-          requestPermission?: () => Promise<"granted" | "denied" | "prompt">;
-        };
-      if (!DeviceOrientation) return;
+  const requestOrientationPermissionAndListen = useCallback(async () => {
+    if (typeof window === "undefined") return;
+    tearDownOrientationListener.current?.();
+    tearDownOrientationListener.current = null;
 
-      if (typeof DeviceOrientation.requestPermission === "function") {
-        try {
-          const permission = await DeviceOrientation.requestPermission();
-          if (permission !== "granted") return;
-        } catch (error) {
-          console.warn("Device orientation permission denied", error);
-          return;
-        }
-      }
-
-      if (cancelled) return;
-      orientationHandler = (rawEvent: Event) => {
-        console.error(rawEvent);
-        const event = rawEvent as DeviceOrientationEvent;
-        if (typeof event.alpha !== "number") return;
-        const normalized = normalizeHeadingUnit(event.alpha);
-        fallbackHeadingRef.current = normalized;
-        if (headingSourceRef.current !== "gps") {
-          headingNormalizedRef.current = normalized;
-          setCurrentHeadingNormalized((prev) =>
-            prev === normalized ? prev : normalized
-          );
-        }
+    const DeviceOrientation =
+      window.DeviceOrientationEvent as typeof DeviceOrientationEvent & {
+        requestPermission?: () => Promise<"granted" | "denied" | "prompt">;
       };
-      const orientationEventName =
-        "ondeviceorientationabsolute" in window
-          ? "deviceorientationabsolute"
-          : "deviceorientation";
-      window.addEventListener(orientationEventName, orientationHandler, true);
+    if (!DeviceOrientation) return;
+
+    if (typeof DeviceOrientation.requestPermission === "function") {
+      try {
+        const permission = await DeviceOrientation.requestPermission();
+        if (permission !== "granted") return;
+      } catch (error) {
+        console.warn("Device orientation permission denied", error);
+        return;
+      }
     }
 
-    setupOrientationListener();
-
-    return () => {
-      cancelled = true;
-      if (orientationHandler) {
-        const orientationEventName =
-          "ondeviceorientationabsolute" in window
-            ? "deviceorientationabsolute"
-            : "deviceorientation";
-        window.removeEventListener(
-          orientationEventName,
-          orientationHandler,
-          true
+    const orientationEventName =
+      "ondeviceorientationabsolute" in window
+        ? "deviceorientationabsolute"
+        : "deviceorientation";
+    const orientationHandler = (rawEvent: Event) => {
+      const event = rawEvent as DeviceOrientationEvent;
+      if (typeof event.alpha !== "number") return;
+      const normalized = normalizeHeadingUnit(event.alpha);
+      fallbackHeadingRef.current = normalized;
+      if (headingSourceRef.current !== "gps") {
+        headingNormalizedRef.current = normalized;
+        setCurrentHeadingNormalized((prev) =>
+          prev === normalized ? prev : normalized
         );
       }
     };
+    window.addEventListener(orientationEventName, orientationHandler, true);
+    tearDownOrientationListener.current = () => {
+      window.removeEventListener(
+        orientationEventName,
+        orientationHandler,
+        true
+      );
+    };
   }, []);
+
+  useEffect(() => {
+    if (sessionActive) {
+      requestOrientationPermissionAndListen();
+    } else {
+      tearDownOrientationListener.current?.();
+      tearDownOrientationListener.current = null;
+    }
+  }, [sessionActive, requestOrientationPermissionAndListen]);
 
   useEffect(() => {
     if (sessionActive) {
