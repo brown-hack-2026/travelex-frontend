@@ -50,21 +50,104 @@ const MOCK_PIN_FEED: PlacePin[] = [
     position: { lat: 0, lng: 0 },
     category: "Shopping",
   },
+  {
+    id: "brown-university-hall",
+    name: "University Hall (Brown University)",
+    position: { lat: 41.8268, lng: -71.4025 },
+    category: "Historic",
+  },
+  {
+    id: "brown-sci-library",
+    name: "Sciences Library (Brown University)",
+    position: { lat: 41.8263, lng: -71.4004 },
+    category: "Architecture",
+  },
+  {
+    id: "brown-granoff",
+    name: "Granoff Center for the Creative Arts (Brown University)",
+    position: { lat: 41.829, lng: -71.4027 },
+    category: "Arts",
+  },
 ];
+
+const PIN_KEYWORDS: Record<string, string[]> = {
+  "coffee-shop": ["coffee", "latte", "cafe", "break"],
+  museum: ["museum", "culture", "art", "history"],
+  viewpoint: ["viewpoint", "scenic", "outlook", "sightseeing"],
+  botanical: ["garden", "nature", "plants"],
+  market: ["market", "shopping", "food"],
+  "brown-university-hall": [
+    "brown",
+    "university",
+    "building",
+    "buildings",
+    "sightseeing",
+    "historic",
+  ],
+  "brown-sci-library": [
+    "brown",
+    "university",
+    "building",
+    "buildings",
+    "library",
+    "sightseeing",
+  ],
+  "brown-granoff": [
+    "brown",
+    "university",
+    "building",
+    "buildings",
+    "arts",
+    "sightseeing",
+  ],
+};
 
 let mockFetchCursor = 0;
 
 type FetchLocationPayload = {
   position: GeoPoint | null;
   headingNormalized: number | null;
+  prompt: string;
 };
 
+function filterPinsForPrompt(prompt: string) {
+  const normalized = prompt.trim().toLowerCase();
+  if (!normalized) return MOCK_PIN_FEED;
+  const tokens = normalized.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return MOCK_PIN_FEED;
+  const filtered = MOCK_PIN_FEED.filter((pin) => {
+    const keywords = PIN_KEYWORDS[pin.id] ?? [];
+    const haystack = `${pin.name} ${pin.category ?? ""} ${keywords.join(
+      " "
+    )}`.toLowerCase();
+    return tokens.every((token) => haystack.includes(token));
+  });
+  return filtered.length > 0 ? filtered : MOCK_PIN_FEED;
+}
+
 async function fetchLocations(
-  _payload: FetchLocationPayload
+  payload: FetchLocationPayload
 ): Promise<PlacePin[]> {
-  await new Promise((resolve) => setTimeout(resolve, 200));
-  if (mockFetchCursor >= MOCK_PIN_FEED.length) return [];
-  const nextPins = MOCK_PIN_FEED.slice(mockFetchCursor, mockFetchCursor + 5);
+  // await fetch("/api/backend", {
+  //   method: "POST",
+  //   body: JSON.stringify({
+  //     method: "POST",
+  //     route: "/v1/app/session/tracking",
+  //     payload: {
+  //       prompt: payload.prompt,
+  //       location: {
+  //         lon: payload.position?.lng,
+  //         lat: payload.position?.lat,
+  //       },
+  //       direction: payload.headingNormalized ?? 0,
+  //     },
+  //   }),
+  // }).catch((error) => {
+  //   console.warn("Failed to send tracking payload", error);
+  // });
+  const feed = filterPinsForPrompt(payload.prompt);
+  if (mockFetchCursor >= feed.length) return [];
+  const nextPins = feed.slice(mockFetchCursor, mockFetchCursor + 5);
   mockFetchCursor += nextPins.length;
   return nextPins;
 }
@@ -132,6 +215,7 @@ export default function MapScreen() {
     number | null
   >(null);
   const [audioSessionActive, setAudioSessionActive] = useState(false);
+  const [tourPrompt, setTourPrompt] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const lastRawPositionRef = useRef<GeoPoint | null>(null);
@@ -145,6 +229,7 @@ export default function MapScreen() {
   const processingAudioRef = useRef(false);
   const pinsRef = useRef<PlacePin[]>([]);
   const awaitingNextPinRef = useRef(false);
+  const tourPromptRef = useRef<string>("");
 
   const latitudeDisplay = currentPosition
     ? currentPosition.lat.toFixed(5)
@@ -160,6 +245,7 @@ export default function MapScreen() {
     currentHeadingNormalized != null
       ? currentHeadingNormalized.toFixed(2)
       : "—";
+  const sessionActive = session.status === "ACTIVE";
 
   async function onStart() {
     setBusy(true);
@@ -180,7 +266,7 @@ export default function MapScreen() {
   }
 
   async function onEnd() {
-    if (session.status !== "ACTIVE") return;
+    if (!sessionActive) return;
     setBusy(true);
     try {
       const res = await endSession(session.sessionId);
@@ -192,12 +278,12 @@ export default function MapScreen() {
   }
 
   function onTakePhoto() {
-    if (session.status !== "ACTIVE" || !selected) return;
+    if (!sessionActive || !selected) return;
     fileInputRef.current?.click();
   }
 
   async function onFilePicked(file: File | null) {
-    if (!file || session.status !== "ACTIVE" || !selected) return;
+    if (!file || !sessionActive || !selected) return;
     setBusy(true);
     try {
       await uploadPhoto(session.sessionId, selected, file);
@@ -218,6 +304,10 @@ export default function MapScreen() {
   useEffect(() => {
     pinsRef.current = pins;
   }, [pins]);
+
+  useEffect(() => {
+    tourPromptRef.current = tourPrompt.trim();
+  }, [tourPrompt]);
 
   const ensureAudioContext = useCallback(() => {
     if (typeof window === "undefined") return null;
@@ -321,7 +411,7 @@ export default function MapScreen() {
   }, []);
 
   useEffect(() => {
-    if (session.status !== "ACTIVE") return;
+    if (!sessionActive) return;
 
     let cancelled = false;
 
@@ -329,6 +419,7 @@ export default function MapScreen() {
       const newPins = await fetchLocations({
         position: positionRef.current,
         headingNormalized: headingNormalizedRef.current,
+        prompt: tourPromptRef.current,
       });
       if (cancelled || newPins.length === 0) return;
       setPins((prev) => [...prev, ...newPins]);
@@ -341,10 +432,10 @@ export default function MapScreen() {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [session.status]);
+  }, [sessionActive]);
 
   useEffect(() => {
-    if (session.status !== "ACTIVE") {
+    if (!sessionActive) {
       awaitingNextPinRef.current = false;
       setHighlightIndex(null);
       return;
@@ -352,10 +443,10 @@ export default function MapScreen() {
     if (pins.length > 0 && highlightIndex === null) {
       setHighlightIndex(0);
     }
-  }, [session.status, pins.length, highlightIndex]);
+  }, [sessionActive, pins.length, highlightIndex]);
 
   useEffect(() => {
-    if (session.status !== "ACTIVE") return;
+    if (!sessionActive) return;
     if (!awaitingNextPinRef.current) return;
     setHighlightIndex((prev) => {
       if (prev === null) return prev;
@@ -365,7 +456,7 @@ export default function MapScreen() {
       }
       return prev;
     });
-  }, [pins.length, session.status]);
+  }, [pins.length, sessionActive]);
 
   useEffect(() => {
     if (
@@ -486,19 +577,22 @@ export default function MapScreen() {
   }, []);
 
   useEffect(() => {
-    if (session.status === "ACTIVE") {
+    if (sessionActive) {
       setAudioSessionActive(true);
       lastSpokenHighlightRef.current = null;
+      queueElevenLabsAudio(
+        "Spotlight audio stream initiated. Listening for upcoming pins."
+      );
     } else {
       setAudioSessionActive(false);
       lastSpokenHighlightRef.current = null;
       cancelAudio();
     }
-  }, [session.status, queueElevenLabsAudio, cancelAudio]);
+  }, [sessionActive, queueElevenLabsAudio, cancelAudio]);
 
   useEffect(() => {
     if (!audioSessionActive) return;
-    if (session.status !== "ACTIVE") return;
+    if (!sessionActive) return;
     if (highlightIndex === null) return;
     const pin = pins[highlightIndex];
     if (!pin) return;
@@ -526,7 +620,7 @@ export default function MapScreen() {
     );
   }, [
     audioSessionActive,
-    session.status,
+    sessionActive,
     highlightIndex,
     pins,
     queueElevenLabsAudio,
@@ -546,6 +640,34 @@ export default function MapScreen() {
                 Session updates drop new pins every 30 seconds. Each pin stays
                 spotlighted until its audio narration completes, then the next
                 available pin takes over.
+              </p>
+            </div>
+            <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold">Tour focus prompt</div>
+                  <p className="text-xs text-neutral-400">
+                    Describe the kinds of places you want highlighted before
+                    starting a session.
+                  </p>
+                </div>
+                {sessionActive && (
+                  <span className="text-[11px] font-semibold uppercase tracking-widest text-emerald-300">
+                    Active
+                  </span>
+                )}
+              </div>
+              <textarea
+                value={tourPrompt}
+                onChange={(e) => setTourPrompt(e.target.value)}
+                disabled={sessionActive}
+                placeholder="e.g., sightseeing Brown University buildings"
+                className="w-full rounded-2xl border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-neutral-500 disabled:opacity-60"
+                rows={2}
+              />
+              <p className="text-xs text-neutral-400">
+                The prompt filters upcoming pins (try “cafes near downtown” or
+                “sightseeing Brown University buildings”).
               </p>
             </div>
             <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4 text-sm">
@@ -596,7 +718,7 @@ export default function MapScreen() {
               <div className="grid gap-3">
                 {pins.map((p, index) => {
                   const isHighlighted =
-                    highlightIndex === index && session.status === "ACTIVE";
+                    highlightIndex === index && sessionActive;
                   return (
                     <button
                       key={p.id}
@@ -638,7 +760,7 @@ export default function MapScreen() {
         <PlaceSheet
           open={!!selected}
           place={selected}
-          sessionActive={session.status === "ACTIVE"}
+          sessionActive={sessionActive}
           busy={busy}
           onClose={() => {
             setSelected(null);
