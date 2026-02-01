@@ -59,7 +59,10 @@ export async function fetchLocations(
       route: "/v1/app/session/tracking",
       payload: {
         sessionId: payload.sessionId,
-        prompt: payload.prompt,
+        prompt:
+          payload.prompt.length > 0
+            ? payload.prompt
+            : "sightseeing Brown University buildings",
         location: {
           lon: payload.position?.lng,
           lat: payload.position?.lat,
@@ -68,8 +71,8 @@ export async function fetchLocations(
       },
     }),
   });
-  const pins = await res.json();
-  return pins;
+  const pinsResult = await res.json();
+  return pinsResult.narrated;
 }
 
 export async function uploadPhoto(

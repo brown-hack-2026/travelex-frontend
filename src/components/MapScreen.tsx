@@ -222,6 +222,8 @@ export default function MapScreen() {
   async function onStart() {
     setBusy(true);
     try {
+      console.log(user);
+      console.log(user?.email);
       const res = await startSession(user?.email ?? "");
       // resetMockLocationFeed();
       setPins([]);
