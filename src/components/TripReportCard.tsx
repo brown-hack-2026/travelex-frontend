@@ -164,7 +164,7 @@ export default function TripReportCard({
       alert(
         `Failed to generate image: ${
           error instanceof Error ? error.message : "Unknown error"
-        }`
+        }`,
       );
       return null;
     } finally {
@@ -179,28 +179,53 @@ export default function TripReportCard({
     const imageDataUrl = await generateImage({ hideButtons: true });
     if (!imageDataUrl) return;
 
-    const link = document.createElement('a');
+    const blob = await (await fetch(imageDataUrl)).blob();
+    const file = new File(
+      [blob],
+      `trip-recap-${tripRecord.sessionId}-${Date.now()}.png`,
+      { type: "image/png" },
+    );
+
+    // Try to share/save to photos on mobile
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({
+          title: "Trip Recap",
+          text: "My travel journey recap",
+          files: [file],
+        });
+        return;
+      } catch (error) {
+        console.log("Share failed, falling back to download");
+      }
+    }
+
+    // Fallback: download link
+    const link = document.createElement("a");
     link.download = `trip-recap-${tripRecord.sessionId}-${Date.now()}.png`;
-    link.href = imageDataUrl;
+    link.href = URL.createObjectURL(blob);
     link.click();
+    URL.revokeObjectURL(link.href);
   };
 
   const handleShare = async () => {
     const shareUrl = `${window.location.origin}/trip_record?sessionId=${tripRecord.sessionId}`;
     const imageDataUrl = await generateImage({ hideButtons: false });
-    
+
     try {
       if (navigator.share) {
         const shareData: ShareData = {
-          title: 'My Travel Recap',
+          title: "My Travel Recap",
           text: `Check out my adventure! ${photos.length} places visited.`,
           url: shareUrl,
         };
 
         if (imageDataUrl) {
           const blob = await (await fetch(imageDataUrl)).blob();
-          const file = new File([blob], 'trip-recap.png', { type: 'image/png' });
-          
+          const file = new File([blob], "trip-recap.png", {
+            type: "image/png",
+          });
+
           if (navigator.canShare?.({ files: [file] })) {
             shareData.files = [file];
           }
@@ -209,10 +234,10 @@ export default function TripReportCard({
         await navigator.share(shareData);
       } else {
         await navigator.clipboard.writeText(shareUrl);
-        alert('Link copied to clipboard!');
+        alert("Link copied to clipboard!");
       }
     } catch (error) {
-      console.error('Share failed:', error);
+      console.error("Share failed:", error);
     }
   };
 
@@ -227,7 +252,9 @@ export default function TripReportCard({
           <h1 className="text-3xl font-normal text-white tracking-tight">
             Your Travel Recap
           </h1>
-          <p className="text-sm text-neutral-500 mt-1 font-light">Journey Analysis</p>
+          <p className="text-sm text-neutral-500 mt-1 font-light">
+            Journey Analysis
+          </p>
         </div>
         {onClose && (
           <button
@@ -239,45 +266,58 @@ export default function TripReportCard({
         )}
       </div>
 
-      <div 
-        ref={shareableRef} 
+      <div
+        ref={shareableRef}
         data-shareable-content
         className="px-6 pb-8 space-y-8"
-        style={{ 
-          background: 'linear-gradient(180deg, #000000 0%, #0f0f0f 50%, #000000 100%)'
+        style={{
+          background:
+            "linear-gradient(180deg, #000000 0%, #0f0f0f 50%, #000000 100%)",
         }}
       >
         {/* Stats Cards */}
         <div className="grid grid-cols-3 gap-3 pt-6">
-          <div 
+          <div
             className="rounded-lg p-4 text-center border"
             style={{
-              background: 'linear-gradient(135deg, #171717 0%, #262626 100%)',
-              borderColor: '#404040',
+              background: "linear-gradient(135deg, #171717 0%, #262626 100%)",
+              borderColor: "#404040",
             }}
           >
-            <div className="text-3xl font-light text-white">{photos.length}</div>
-            <div className="text-xs font-normal mt-1 text-neutral-400">PLACES</div>
+            <div className="text-3xl font-light text-white">
+              {photos.length}
+            </div>
+            <div className="text-xs font-normal mt-1 text-neutral-400">
+              PLACES
+            </div>
           </div>
-          <div 
+          <div
             className="rounded-lg p-4 text-center border"
             style={{
-              background: 'linear-gradient(135deg, #171717 0%, #262626 100%)',
-              borderColor: '#404040',
+              background: "linear-gradient(135deg, #171717 0%, #262626 100%)",
+              borderColor: "#404040",
             }}
           >
-            <div className="text-3xl font-light text-white">{totalDistance}</div>
-            <div className="text-xs font-normal mt-1 text-neutral-400">MILES</div>
+            <div className="text-3xl font-light text-white">
+              {totalDistance}
+            </div>
+            <div className="text-xs font-normal mt-1 text-neutral-400">
+              MILES
+            </div>
           </div>
-          <div 
+          <div
             className="rounded-lg p-4 text-center border"
             style={{
-              background: 'linear-gradient(135deg, #171717 0%, #262626 100%)',
-              borderColor: '#404040',
+              background: "linear-gradient(135deg, #171717 0%, #262626 100%)",
+              borderColor: "#404040",
             }}
           >
-            <div className="text-3xl font-light text-white">{pathPoints.length}</div>
-            <div className="text-xs font-normal mt-1 text-neutral-400">STOPS</div>
+            <div className="text-3xl font-light text-white">
+              {pathPoints.length}
+            </div>
+            <div className="text-xs font-normal mt-1 text-neutral-400">
+              STOPS
+            </div>
           </div>
         </div>
 
@@ -301,17 +341,18 @@ export default function TripReportCard({
           <h2 className="text-xl font-normal mb-4 text-white tracking-tight">
             Journey Map
           </h2>
-          <div 
+          <div
             className="rounded-lg overflow-hidden border"
             style={{
-              boxShadow: '0 4px 24px rgba(0, 0, 0, 0.5)',
-              borderColor: '#262626',
+              boxShadow: "0 4px 24px rgba(0, 0, 0, 0.5)",
+              borderColor: "#262626",
             }}
           >
             {(!hasApiKey || loadError) && (
               <div className="w-full h-[450px] flex items-center justify-center bg-neutral-950">
                 <div className="text-neutral-400 text-center px-6">
-                  Google Maps failed to load. Check NEXT_PUBLIC_GOOGLE_MAPS_API_KEY.
+                  Google Maps failed to load. Check
+                  NEXT_PUBLIC_GOOGLE_MAPS_API_KEY.
                 </div>
               </div>
             )}
@@ -323,7 +364,9 @@ export default function TripReportCard({
             <div
               ref={mapRef}
               className="w-full h-[450px]"
-              style={{ display: isMapsApiLoaded && !loadError ? 'block' : 'none' }}
+              style={{
+                display: isMapsApiLoaded && !loadError ? "block" : "none",
+              }}
             />
           </div>
         </div>
@@ -339,9 +382,10 @@ export default function TripReportCard({
                 key={photo.id}
                 className="rounded-lg overflow-hidden border"
                 style={{
-                  background: 'linear-gradient(135deg, #0a0a0a 0%, #171717 100%)',
-                  borderColor: '#262626',
-                  boxShadow: '0 2px 12px rgba(0, 0, 0, 0.3)',
+                  background:
+                    "linear-gradient(135deg, #0a0a0a 0%, #171717 100%)",
+                  borderColor: "#262626",
+                  boxShadow: "0 2px 12px rgba(0, 0, 0, 0.3)",
                 }}
               >
                 <img
@@ -351,53 +395,55 @@ export default function TripReportCard({
                 />
                 <div className="p-5">
                   <div className="flex items-center gap-3 mb-2">
-                    <div 
+                    <div
                       className="w-8 h-8 rounded flex items-center justify-center text-sm font-normal border"
                       style={{
-                        background: '#171717',
-                        borderColor: '#404040',
-                        color: '#a3a3a3',
+                        background: "#171717",
+                        borderColor: "#404040",
+                        color: "#a3a3a3",
                       }}
                     >
                       {index + 1}
                     </div>
-                    <div className="text-lg font-normal text-white">{photo.placeName}</div>
+                    <div className="text-lg font-normal text-white">
+                      {photo.placeName}
+                    </div>
                   </div>
                   <div className="text-sm text-neutral-500 font-light">
-                    {photo.timestamp.toLocaleString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
+                    {photo.timestamp.toLocaleString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
                     })}
                   </div>
                 </div>
-                </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
+        </div>
 
         {/* Action Buttons */}
         <div ref={buttonsRef} className="space-y-3 pb-4">
           <button
             className="w-full rounded py-4 text-base font-normal transition-transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed border"
-            style={{ 
-              background: 'linear-gradient(135deg, #262626 0%, #404040 100%)',
-              color: '#ffffff',
-              borderColor: '#525252',
+            style={{
+              background: "linear-gradient(135deg, #262626 0%, #404040 100%)",
+              color: "#ffffff",
+              borderColor: "#525252",
             }}
             onClick={handleDownload}
             disabled={isGenerating}
           >
-            {isGenerating ? 'GENERATING...' : 'DOWNLOAD RECAP'}
+            {isGenerating ? "GENERATING..." : "DOWNLOAD RECAP"}
           </button>
 
           <button
             className="w-full rounded py-4 text-base font-normal transition-transform active:scale-[0.98] disabled:opacity-50 border"
-            style={{ 
-              backgroundColor: '#0a0a0a',
-              color: '#a3a3a3',
-              borderColor: '#262626',
+            style={{
+              backgroundColor: "#0a0a0a",
+              color: "#a3a3a3",
+              borderColor: "#262626",
             }}
             onClick={handleShare}
             disabled={isGenerating}
