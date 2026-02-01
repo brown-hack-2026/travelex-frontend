@@ -8,7 +8,7 @@ const DEFAULT_CENTER = { lat: 41.8268, lng: -71.4025 }; // Brown University
 
 interface MapViewProps {
   pins: PlacePin[];
-  highlightPin: PlacePin | null;
+  highlightIndex: number | null;
   selectedPin: PlacePin | null;
   currentPosition: { lat: number; lng: number } | null;
   onPinClick: (pin: PlacePin) => void;
@@ -16,7 +16,7 @@ interface MapViewProps {
 
 export default function MapView({
   pins,
-  highlightPin,
+  highlightIndex,
   selectedPin,
   currentPosition,
   onPinClick,
@@ -87,16 +87,17 @@ export default function MapView({
   }
 
   return (
+    
     <GoogleMap
       mapContainerStyle={{ height: "100%", width: "100%" }}
       center={center}
       zoom={15}
       options={mapOptions}
     >
-      {pins.map((pin) => {
-        console.log("highlighted:", highlightPin);
+      {pins.map((pin, index) => {
+        console.log("highlighted:", highlightIndex);
         const isSelected = selectedPin && pin.id === selectedPin.id;
-        const isHighlighted = highlightPin && pin.id === highlightPin.id;
+        const isHighlighted = highlightIndex !== null ? highlightIndex === index : false;
 
         let fillColor = "#10b981"; // default green
         let strokeWidth = 2;

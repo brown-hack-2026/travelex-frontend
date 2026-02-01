@@ -644,7 +644,7 @@ export default function MapScreen() {
 
       <div className="relative h-dvh">
         <div className="absolute inset-0 bg-gradient-to-b from-neutral-900 to-neutral-950">
-          <div className="h-full w-full flex flex-col px-4 pb-32 pt-28 gap-4 overflow-y-auto">
+          <div className="h-full w-full flex flex-col px-4 pb-16 pt-28 gap-4 overflow-y-auto">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="text-lg font-semibold">
@@ -771,12 +771,11 @@ export default function MapScreen() {
               </>
             ) : (
               <div
-                className="rounded-3xl border border-white/10 bg-white/[0.02] overflow-hidden"
-                style={{ height: "60vh" }}
+                className="rounded-3xl border border-white/10 bg-white/[0.02] overflow-hidden h-full"
               >
                 <MapView
                   pins={pins}
-                  highlightPin={highlightIndex ? pins[highlightIndex] : null}
+                  highlightIndex={highlightIndex}
                   selectedPin={selected}
                   currentPosition={currentPosition}
                   onPinClick={setSelected}
