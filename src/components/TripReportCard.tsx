@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { TripRecord } from "@/lib/api";
-import { LoadScript } from "@react-google-maps/api";
+import { useJsApiLoader } from "@react-google-maps/api";
 import html2canvas from "html2canvas";
 
 type TripPhoto = {
@@ -30,8 +30,13 @@ export default function TripReportCard({
   const shareableRef = useRef<HTMLDivElement>(null);
   const buttonsRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
+  const { isLoaded: isMapsApiLoaded, loadError } = useJsApiLoader({
+    id: "trip-report-map-script",
+    googleMapsApiKey,
+    libraries: ["places", "geometry", "drawing"],
+  });
 
   // Derive data from tripRecord
   const locations = Object.values(tripRecord.locationPhotoMap).sort(
@@ -57,18 +62,8 @@ export default function TripReportCard({
       : `${Math.floor(tripDuration / 1000)}s`;
 
   useEffect(() => {
-    const checkGoogleMaps = () => {
-      if (typeof google !== "undefined" && google.maps) {
-        setIsLoaded(true);
-      } else {
-        setTimeout(checkGoogleMaps, 100);
-      }
-    };
-    checkGoogleMaps();
-  }, []);
-
-  useEffect(() => {
-    if (!mapRef.current || map || !isLoaded || pathPoints.length === 0) return;
+    if (!mapRef.current || map || !isMapsApiLoaded || pathPoints.length === 0)
+      return;
 
     const newMap = new google.maps.Map(mapRef.current, {
       center: pathPoints[0],
@@ -125,7 +120,7 @@ export default function TripReportCard({
     newMap.fitBounds(bounds);
 
     setMap(newMap);
-  }, [pathPoints, locations, map, isLoaded]);
+  }, [pathPoints, locations, map, isMapsApiLoaded]);
 
   const generateImage = async (options?: { hideButtons?: boolean }) => {
     if (!shareableRef.current) return null;
@@ -226,10 +221,6 @@ export default function TripReportCard({
   const totalDistance = (pathPoints.length * 0.5).toFixed(1);
 
   return (
-    <LoadScript
-      libraries={["places", "geometry", "drawing"]}
-      googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}
-    >
     <div className="fixed inset-0 bg-black z-50 overflow-y-auto font-sans">
       {/* Header */}
       <div className="sticky top-0 bg-black z-10 p-6 flex justify-between items-center border-b border-neutral-800">
@@ -318,7 +309,14 @@ export default function TripReportCard({
               borderColor: '#262626',
             }}
           >
-            {!isLoaded && (
+            {(!googleMapsApiKey || loadError) && (
+              <div className="w-full h-[450px] flex items-center justify-center bg-neutral-950">
+                <div className="text-neutral-400 text-center px-6">
+                  Google Maps failed to load. Check NEXT_PUBLIC_GOOGLE_MAPS_API_KEY.
+                </div>
+              </div>
+            )}
+            {!loadError && googleMapsApiKey && !isMapsApiLoaded && (
               <div className="w-full h-[450px] flex items-center justify-center bg-neutral-950">
                 <div className="text-neutral-600">Loading map...</div>
               </div>
@@ -326,7 +324,7 @@ export default function TripReportCard({
             <div
               ref={mapRef}
               className="w-full h-[450px]"
-              style={{ display: isLoaded ? 'block' : 'none' }}
+              style={{ display: isMapsApiLoaded && !loadError ? 'block' : 'none' }}
             />
           </div>
         </div>
@@ -409,7 +407,6 @@ export default function TripReportCard({
           </button>
         </div>
       </div>
-      </div>
-    </LoadScript>
+    </div>
   );
 }
