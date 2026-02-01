@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { TripRecord } from "@/lib/api";
-import { useJsApiLoader } from "@react-google-maps/api";
+import {
+  GOOGLE_MAPS_API_KEY,
+  useGoogleMapsLoader,
+} from "@/hooks/useGoogleMapsLoader";
 import html2canvas from "html2canvas";
 
 type TripPhoto = {
@@ -31,12 +34,8 @@ export default function TripReportCard({
   const buttonsRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
-  const { isLoaded: isMapsApiLoaded, loadError } = useJsApiLoader({
-    id: "trip-report-map-script",
-    googleMapsApiKey,
-    libraries: ["places", "geometry", "drawing"],
-  });
+  const { isLoaded: isMapsApiLoaded, loadError } = useGoogleMapsLoader();
+  const hasApiKey = Boolean(GOOGLE_MAPS_API_KEY);
 
   // Derive data from tripRecord
   const locations = Object.values(tripRecord.locationPhotoMap).sort(
@@ -309,14 +308,14 @@ export default function TripReportCard({
               borderColor: '#262626',
             }}
           >
-            {(!googleMapsApiKey || loadError) && (
+            {(!hasApiKey || loadError) && (
               <div className="w-full h-[450px] flex items-center justify-center bg-neutral-950">
                 <div className="text-neutral-400 text-center px-6">
                   Google Maps failed to load. Check NEXT_PUBLIC_GOOGLE_MAPS_API_KEY.
                 </div>
               </div>
             )}
-            {!loadError && googleMapsApiKey && !isMapsApiLoaded && (
+            {!loadError && hasApiKey && !isMapsApiLoaded && (
               <div className="w-full h-[450px] flex items-center justify-center bg-neutral-950">
                 <div className="text-neutral-600">Loading map...</div>
               </div>

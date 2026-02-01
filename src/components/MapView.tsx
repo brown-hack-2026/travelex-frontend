@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo } from "react";
-import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
+import { useCallback, useMemo } from "react";
+import { GoogleMap, Marker } from "@react-google-maps/api";
 import type { PlacePin } from "@/types/ui";
-
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+import {
+  GOOGLE_MAPS_API_KEY,
+  useGoogleMapsLoader,
+} from "@/hooks/useGoogleMapsLoader";
 
 const DEFAULT_CENTER = { lat: 41.8268, lng: -71.4025 }; // Brown University
 
@@ -21,9 +23,8 @@ export default function MapView({
   currentPosition,
   onPinClick,
 }: MapViewProps) {
-  const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-  });
+  const { isLoaded, loadError } = useGoogleMapsLoader();
+  const hasApiKey = Boolean(GOOGLE_MAPS_API_KEY);
 
   const center = useMemo(() => {
     if (currentPosition) return currentPosition;
@@ -62,7 +63,7 @@ export default function MapView({
     [onPinClick],
   );
 
-  if (!GOOGLE_MAPS_API_KEY) {
+  if (!hasApiKey) {
     return (
       <div className="h-full w-full flex items-center justify-center text-white">
         <div className="text-center">
@@ -70,6 +71,19 @@ export default function MapView({
           <div className="text-sm text-neutral-300">
             Google Maps API key not configured. Please set
             NEXT_PUBLIC_GOOGLE_MAPS_API_KEY.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="h-full w-full flex items-center justify-center text-white">
+        <div className="text-center">
+          <div className="text-lg font-semibold">Map View</div>
+          <div className="text-sm text-neutral-300">
+            Failed to load Google Maps. Please try again.
           </div>
         </div>
       </div>
