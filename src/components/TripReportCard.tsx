@@ -175,38 +175,38 @@ export default function TripReportCard({
     }
   };
 
-  const handleDownload = async () => {
-    const imageDataUrl = await generateImage({ hideButtons: true });
-    if (!imageDataUrl) return;
+  // const handleDownload = async () => {
+  //   const imageDataUrl = await generateImage({ hideButtons: true });
+  //   if (!imageDataUrl) return;
 
-    const blob = await (await fetch(imageDataUrl)).blob();
-    const file = new File(
-      [blob],
-      `trip-recap-${tripRecord.sessionId}-${Date.now()}.png`,
-      { type: "image/png" },
-    );
+  //   const blob = await (await fetch(imageDataUrl)).blob();
+  //   const file = new File(
+  //     [blob],
+  //     `trip-recap-${tripRecord.sessionId}-${Date.now()}.png`,
+  //     { type: "image/png" },
+  //   );
 
-    // Try to share/save to photos on mobile
-    if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      try {
-        await navigator.share({
-          title: "Trip Recap",
-          text: "My travel journey recap",
-          files: [file],
-        });
-        return;
-      } catch (error) {
-        console.log("Share failed, falling back to download");
-      }
-    }
+  //   // Try to share/save to photos on mobile
+  //   if (navigator.share && navigator.canShare?.({ files: [file] })) {
+  //     try {
+  //       await navigator.share({
+  //         title: "Trip Recap",
+  //         text: "My travel journey recap",
+  //         files: [file],
+  //       });
+  //       return;
+  //     } catch (error) {
+  //       console.log("Share failed, falling back to download");
+  //     }
+  //   }
 
-    // Fallback: download link
-    const link = document.createElement("a");
-    link.download = `trip-recap-${tripRecord.sessionId}-${Date.now()}.png`;
-    link.href = URL.createObjectURL(blob);
-    link.click();
-    URL.revokeObjectURL(link.href);
-  };
+  //   // Fallback: download link
+  //   const link = document.createElement("a");
+  //   link.download = `trip-recap-${tripRecord.sessionId}-${Date.now()}.png`;
+  //   link.href = URL.createObjectURL(blob);
+  //   link.click();
+  //   URL.revokeObjectURL(link.href);
+  // };
 
   const handleShare = async () => {
     const shareUrl = `${window.location.origin}/trip_record?sessionId=${tripRecord.sessionId}`;
@@ -240,6 +240,48 @@ export default function TripReportCard({
       console.error("Share failed:", error);
     }
   };
+
+  const handleDownload = async () => {
+  const imageDataUrl = await generateImage({ hideButtons: true });
+  if (!imageDataUrl) return;
+
+  const blob = await (await fetch(imageDataUrl)).blob();
+  const filename = `trip-recap-${tripRecord.sessionId}-${Date.now()}.png`;
+  const file = new File([blob], filename, { type: "image/png" });
+
+  // Prefer native share sheet (best chance to "Save Image" on mobile)
+  const canNativeShare =
+    typeof navigator !== "undefined" &&
+    "share" in navigator &&
+    // canShare is required for files on some browsers
+    (!!navigator.canShare ? navigator.canShare({ files: [file] }) : true);
+
+  if (canNativeShare) {
+    try {
+      await navigator.share({
+        title: "Trip Recap",
+        text: "Save or share your trip recap",
+        files: [file],
+      });
+      return;
+    } catch (err) {
+      // User cancellation is not really an error; just fall back quietly.
+      // Some browsers throw AbortError on cancel.
+      console.log("Share aborted/failed, falling back to download:", err);
+    }
+  }
+
+  // Fallback: download (iOS often saves to Files; user can then Save Image)
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
 
   // Calculate total distance (mock - replace with actual calculation)
   const totalDistance = (pathPoints.length * 0.5).toFixed(1);
