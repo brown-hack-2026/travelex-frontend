@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import TripReportCard from "@/components/TripReportCard";
-import { LoadScript } from "@react-google-maps/api";
 import { getTripData, TripRecord } from "@/lib/api";
 
-export default function TripRecordPage() {
+const ScreenMessage = ({ message }: { message: string }) => (
+  <div className="min-h-screen bg-neutral-950 text-white flex items-center justify-center">
+    <div className="text-lg">{message}</div>
+  </div>
+);
+
+function TripRecordPageContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("sessionId");
   const [tripRecord, setTripRecord] = useState<TripRecord | null>(null);
@@ -24,24 +29,22 @@ export default function TripRecordPage() {
   }, [sessionId]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-neutral-950 text-white flex items-center justify-center">
-        <div className="text-lg">Loading trip record...</div>
-      </div>
-    );
+    return <ScreenMessage message="Loading trip record..." />;
   }
 
   if (!tripRecord) {
-    return (
-      <div className="min-h-screen bg-neutral-950 text-white flex items-center justify-center">
-        <div className="text-lg">Trip record not found.</div>
-      </div>
-    );
+    return <ScreenMessage message="Trip record not found." />;
   }
 
   return (
-    
-      <TripReportCard tripRecord={tripRecord} />
-    
+    <TripReportCard tripRecord={tripRecord} />
+  );
+}
+
+export default function TripRecordPage() {
+  return (
+    <Suspense fallback={<ScreenMessage message="Loading trip record..." />}>
+      <TripRecordPageContent />
+    </Suspense>
   );
 }
