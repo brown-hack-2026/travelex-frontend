@@ -94,7 +94,6 @@ export default function MapView({
       options={mapOptions}
     >
       {pins.map((pin, index) => {
-        console.log("highlighted:", highlightIndex);
         const isSelected = selectedPin && pin.placeId === selectedPin.placeId;
         const isHighlighted =
           highlightIndex !== null ? highlightIndex === index : false;
