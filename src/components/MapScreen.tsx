@@ -7,7 +7,7 @@ import {
   startSession,
   endSession,
   uploadPhoto,
-  fetchLocationsCached,
+  fetchLocations,
 } from "@/lib/api";
 import TopBar from "@/components/TopBar";
 import SessionBar from "@/components/SessionBar";
@@ -19,6 +19,8 @@ import CameraModal from "@/components/CameraModal";
 import { useAtom } from "jotai";
 import { userAtom } from "@/utils/atom";
 import { GeoPoint } from "@/utils/types";
+
+const PIN_REFRESH_INTERVAL_MS = 30_000;
 
 type AudioQueueItem = {
   text: string;
@@ -217,6 +219,9 @@ export default function MapScreen() {
   const pinsRef = useRef<PlacePin[]>([]);
   const awaitingNextPinRef = useRef(false);
   const tourPromptRef = useRef<string>("");
+  const loadPinsRef = useRef<((bypassId?: string) => Promise<void>) | null>(
+    null
+  );
 
   const latitudeDisplay = currentPosition
     ? currentPosition.lat.toFixed(5)
@@ -286,7 +291,7 @@ export default function MapScreen() {
 
   async function loadPins(bypassId?: string) {
     if (!bypassId && session.status != "ACTIVE") return;
-    const newPins = await fetchLocationsCached({
+    const newPins = await fetchLocations({
       sessionId: session.status == "ACTIVE" ? session.sessionId : bypassId!,
       position: positionRef.current,
       headingNormalized: headingNormalizedRef.current,
@@ -300,6 +305,8 @@ export default function MapScreen() {
       ...Object.fromEntries(dedupPins.map((pin) => [pin.placeId, "exists"])),
     });
   }
+
+  loadPinsRef.current = loadPins;
 
   useEffect(() => {
     positionRef.current = currentPosition;
@@ -493,7 +500,6 @@ export default function MapScreen() {
         }
 
         lastRawPositionRef.current = nextPos;
-        loadPins();
       },
       (error) => {
         console.error("Failed to watch position", error);
@@ -504,12 +510,29 @@ export default function MapScreen() {
         timeout: 10_000,
       }
     );
-    loadPins();
-
     return () => {
       navigator.geolocation.clearWatch(watchId);
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!sessionActive) return;
+    const triggerPinLoad = () => {
+      const loadFn = loadPinsRef.current;
+      if (!loadFn) return;
+      loadFn().catch((error) => {
+        console.error("Failed to load pins", error);
+      });
+    };
+    const intervalId = window.setInterval(() => {
+      triggerPinLoad();
+    }, PIN_REFRESH_INTERVAL_MS);
+    triggerPinLoad();
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [sessionActive]);
 
   const tearDownOrientationListener = useRef<(() => void) | null>(null);
 
@@ -764,6 +787,7 @@ export default function MapScreen() {
         {/* Session controls */}
         <div className="absolute top-14 left-0 right-0 px-4 z-20">
           <SessionBar
+            headingValue={headingDegreesDisplay}
             session={session}
             busy={busy}
             onStart={onStart}

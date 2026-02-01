@@ -2,14 +2,14 @@
 
 import { SessionState } from "@/types/ui";
 
-
-
 export default function SessionBar({
+  headingValue,
   session,
   busy,
   onStart,
   onEnd,
 }: {
+  headingValue: string;
   session: SessionState;
   busy: boolean;
   onStart: () => void;
@@ -36,7 +36,14 @@ export default function SessionBar({
       )}
 
       <div className="rounded-2xl bg-white/10 border border-white/15 px-3 py-3 text-xs text-neutral-200 min-w-[110px] text-center backdrop-blur">
-        {session.status === "ACTIVE" ? "Recording…" : session.status === "ENDED" ? "Recap ready" : "Not started"}
+        {session.status === "ACTIVE"
+          ? "Recording…"
+          : session.status === "ENDED"
+          ? "Recap ready"
+          : "Not started"}
+      </div>
+      <div className="rounded-2xl bg-white/10 border border-white/15 px-3 py-3 text-xs text-neutral-200 min-w-[110px] text-center backdrop-blur">
+        {headingValue}
       </div>
     </div>
   );

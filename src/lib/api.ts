@@ -59,7 +59,7 @@ export async function startSession(user: string): Promise<{
 }
 
 export async function endSession(
-  sessionId: string,
+  sessionId: string
 ): Promise<{ sessionId: string }> {
   const res = await fetch("/api/backend", {
     method: "POST",
@@ -84,7 +84,7 @@ type FetchLocationPayload = {
   prompt: string;
 };
 
-async function fetchLocations(
+export async function fetchLocations(
   payload: FetchLocationPayload
 ): Promise<PlacePin[]> {
   const res = await fetch("/api/backend", {
@@ -113,7 +113,7 @@ async function fetchLocations(
 export async function uploadPhoto(
   sessionId: string,
   place: PlacePin,
-  file: File,
+  file: File
 ): Promise<void> {
   // Convert file to base64 data URL
   const toBase64 = (file: File) =>
@@ -174,12 +174,8 @@ function cacheFunctionCall(func: (...args: any) => any, ttl: number) {
   };
 }
 
-export const fetchLocationsCached: (
-  payload: FetchLocationPayload
-) => Promise<PlacePin[]> = cacheFunctionCall(fetchLocations, 5000);
-
 export async function getTripData(sessionId: string): Promise<TripRecord> {
-  console.log("getTripData sessionId:", sessionId)
+  console.log("getTripData sessionId:", sessionId);
   const res = await fetch("/api/backend", {
     method: "POST",
     body: JSON.stringify({
