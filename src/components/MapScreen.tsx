@@ -677,7 +677,7 @@ export default function MapScreen() {
                 “sightseeing Brown University buildings”).
               </p>
             </div>
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4 text-sm">
+            {/* <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4 text-sm">
               <div className="text-[11px] uppercase tracking-[0.2em] text-neutral-400">
                 Live heading &amp; position
               </div>
@@ -715,7 +715,7 @@ export default function MapScreen() {
                 Values refresh automatically from geolocation + device
                 orientation permissions.
               </p>
-            </div>
+            </div> */}
             {viewMode === "map" ? (
               <div className="h-[60vh] w-full rounded-3xl overflow-hidden border border-white/10">
                 <MapView

@@ -7,6 +7,11 @@ import {
 } from "@/hooks/useGoogleMapsLoader";
 
 const DEFAULT_CENTER = { lat: 41.8268, lng: -71.4025 }; // Brown University
+const MAP_CONTAINER_STYLE = {
+  width: "100%",
+  height: "100%",
+  minHeight: "320px",
+};
 
 interface MapViewProps {
   pins: PlacePin[];
@@ -102,7 +107,8 @@ export default function MapView({
 
   return (
     <GoogleMap
-      mapContainerStyle={{ height: "100%", width: "100%" }}
+      mapContainerStyle={MAP_CONTAINER_STYLE}
+      mapContainerClassName="h-full w-full min-h-[320px] sm:min-h-[420px]"
       center={center}
       zoom={15}
       options={mapOptions}
