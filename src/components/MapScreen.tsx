@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast as toastify, ToastContainer } from "react-toastify";
 import type { PlacePin } from "@/types/ui";
 import {
   startSession,
@@ -14,6 +15,7 @@ import PlaceSheet from "@/components/PlaceSheet";
 import WrappedPreview from "@/components/WrappedPreview";
 import MapView from "@/components/MapView";
 import { createAudioStreamFromText } from "@/utils/elevenlabs";
+import CameraModal from "@/components/CameraModal";
 import { useAtom } from "jotai";
 import { userAtom } from "@/utils/atom";
 import { GeoPoint } from "@/utils/types";
@@ -175,6 +177,15 @@ function calculateBearing(from: GeoPoint, to: GeoPoint) {
 }
 
 export default function MapScreen() {
+  // Toast state
+  const [toast, setToast] = useState<string | null>(null);
+  // Hide toast after 2.5s
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 2500);
+      return () => clearTimeout(t);
+    }
+  }, [toast]);
   const [user] = useAtom(userAtom);
   const [session, setSession] = useState<SessionState>({ status: "IDLE" });
   const [selected, setSelected] = useState<PlacePin | null>(null);
@@ -191,6 +202,7 @@ export default function MapScreen() {
   const [tourPrompt, setTourPrompt] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
 
+  const [cameraOpen, setCameraOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const lastRawPositionRef = useRef<GeoPoint | null>(null);
   const fallbackHeadingRef = useRef<number | null>(null);
@@ -258,7 +270,7 @@ export default function MapScreen() {
 
   function onTakePhoto() {
     if (!sessionActive || !selected) return;
-    fileInputRef.current?.click();
+    setCameraOpen(true);
   }
 
   async function onFilePicked(file: File | null) {
@@ -266,7 +278,7 @@ export default function MapScreen() {
     setBusy(true);
     try {
       await uploadPhoto(session.sessionId, selected, file);
-      // optional toast
+      toastify.success("Photo uploaded!");
     } finally {
       setBusy(false);
     }
@@ -598,6 +610,23 @@ export default function MapScreen() {
       <TopBar />
 
       <div className="relative h-dvh">
+        <ToastContainer
+          position="top-center"
+          autoClose={2500}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="dark"
+        />
+        {/* Toast notification */}
+        {toast && (
+          <div className="fixed top-6 left-1/2 z-50 -translate-x-1/2 bg-neutral-900 text-white px-6 py-3 rounded-xl shadow-lg border border-emerald-400 animate-fade-in-out">
+            {toast}
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-b from-neutral-900 to-neutral-950">
           <div className="h-full w-full flex flex-col px-4 pb-16 pt-28 gap-4 overflow-y-auto">
             <div className="space-y-2">
@@ -764,13 +793,11 @@ export default function MapScreen() {
           </div>
         )}
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          className="hidden"
-          onChange={(e) => onFilePicked(e.target.files?.[0] ?? null)}
+        {/* Camera modal for taking photos */}
+        <CameraModal
+          open={cameraOpen}
+          onClose={() => setCameraOpen(false)}
+          onCapture={(file) => onFilePicked(file)}
         />
       </div>
     </div>

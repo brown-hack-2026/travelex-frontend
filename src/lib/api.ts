@@ -80,6 +80,32 @@ export async function uploadPhoto(
   place: PlacePin,
   file: File
 ): Promise<void> {
-  // Replace with real API call
-  return;
+  // Convert file to base64 data URL
+  const toBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const photoData = await toBase64(file);
+
+  const res = await fetch("/api/backend", {
+    method: "POST",
+    body: JSON.stringify({
+      method: "POST",
+      route: "/v1/app/session/upload_photo",
+      payload: {
+        sessionId,
+        placeId: place.placeId,
+        photoData,
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.message || "Photo upload failed");
+  }
 }
