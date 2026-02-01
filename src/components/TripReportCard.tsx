@@ -212,6 +212,9 @@ export default function TripReportCard({
     const shareUrl = `${window.location.origin}/trip_record?sessionId=${tripRecord.sessionId}`;
     const imageDataUrl = await generateImage({ hideButtons: false });
 
+    console.log("Sharing URL:", shareUrl);
+    console.log("Image data URL generated:", !!imageDataUrl);
+
     try {
       if (navigator.share) {
         const shareData: ShareData = {
@@ -226,62 +229,74 @@ export default function TripReportCard({
             type: "image/png",
           });
 
+          console.log("File created:", file);
+          console.log(
+            "canShare files:",
+            navigator.canShare?.({ files: [file] }),
+          );
+
           if (navigator.canShare?.({ files: [file] })) {
             shareData.files = [file];
+            console.log("Files added to share data");
+          } else {
+            console.log("Files not supported, sharing URL only");
           }
         }
 
+        console.log("Calling navigator.share with:", shareData);
         await navigator.share(shareData);
+        console.log("Share successful");
       } else {
+        console.log("navigator.share not available, copying to clipboard");
         await navigator.clipboard.writeText(shareUrl);
         alert("Link copied to clipboard!");
       }
     } catch (error) {
       console.error("Share failed:", error);
+      alert(`Share failed: ${error.message || "Unknown error"}`);
     }
   };
 
   const handleDownload = async () => {
-  const imageDataUrl = await generateImage({ hideButtons: true });
-  if (!imageDataUrl) return;
+    const imageDataUrl = await generateImage({ hideButtons: true });
+    if (!imageDataUrl) return;
 
-  const blob = await (await fetch(imageDataUrl)).blob();
-  const filename = `trip-recap-${tripRecord.sessionId}-${Date.now()}.png`;
-  const file = new File([blob], filename, { type: "image/png" });
+    const blob = await (await fetch(imageDataUrl)).blob();
+    const filename = `trip-recap-${tripRecord.sessionId}-${Date.now()}.png`;
+    const file = new File([blob], filename, { type: "image/png" });
 
-  // Prefer native share sheet (best chance to "Save Image" on mobile)
-  const canNativeShare =
-    typeof navigator !== "undefined" &&
-    "share" in navigator &&
-    // canShare is required for files on some browsers
-    (!!navigator.canShare ? navigator.canShare({ files: [file] }) : true);
+    // Prefer native share sheet (best chance to "Save Image" on mobile)
+    const canNativeShare =
+      typeof navigator !== "undefined" &&
+      "share" in navigator &&
+      // canShare is required for files on some browsers
+      (!!navigator.canShare ? navigator.canShare({ files: [file] }) : true);
 
-  if (canNativeShare) {
-    try {
-      await navigator.share({
-        title: "Trip Recap",
-        text: "Save or share your trip recap",
-        files: [file],
-      });
-      return;
-    } catch (err) {
-      // User cancellation is not really an error; just fall back quietly.
-      // Some browsers throw AbortError on cancel.
-      console.log("Share aborted/failed, falling back to download:", err);
+    if (canNativeShare) {
+      try {
+        await navigator.share({
+          title: "Trip Recap",
+          text: "Save or share your trip recap",
+          files: [file],
+        });
+        return;
+      } catch (err) {
+        // User cancellation is not really an error; just fall back quietly.
+        // Some browsers throw AbortError on cancel.
+        console.log("Share aborted/failed, falling back to download:", err);
+      }
     }
-  }
 
-  // Fallback: download (iOS often saves to Files; user can then Save Image)
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-};
-
+    // Fallback: download (iOS often saves to Files; user can then Save Image)
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
 
   // Calculate total distance (mock - replace with actual calculation)
   const totalDistance = (pathPoints.length * 0.5).toFixed(1);
