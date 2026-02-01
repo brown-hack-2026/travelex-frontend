@@ -245,6 +245,7 @@ export default function MapScreen() {
       console.log(user);
       console.log(user?.email);
       const res = await startSession(user?.email ?? "");
+      await requestOrientationPermissionAndListen();
       // resetMockLocationFeed();
       setPins([]);
       setHighlightIndex(null);
@@ -584,13 +585,18 @@ export default function MapScreen() {
   }, []);
 
   useEffect(() => {
-    if (sessionActive) {
-      requestOrientationPermissionAndListen();
-    } else {
+    if (!sessionActive) {
       tearDownOrientationListener.current?.();
       tearDownOrientationListener.current = null;
     }
-  }, [sessionActive, requestOrientationPermissionAndListen]);
+  }, [sessionActive]);
+
+  useEffect(() => {
+    return () => {
+      tearDownOrientationListener.current?.();
+      tearDownOrientationListener.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (sessionActive) {
