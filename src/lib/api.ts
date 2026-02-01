@@ -49,7 +49,7 @@ type FetchLocationPayload = {
   prompt: string;
 };
 
-export async function fetchLocations(
+async function fetchLocations(
   payload: FetchLocationPayload
 ): Promise<PlacePin[]> {
   const res = await fetch("/api/backend", {
@@ -109,3 +109,36 @@ export async function uploadPhoto(
     throw new Error(error.message || "Photo upload failed");
   }
 }
+
+function cacheFunctionCall(func: (...args: any) => any, ttl: number) {
+  let cache = new Map();
+
+  return async function (...args: any) {
+    // Generate a unique key based on the function name (or a fixed key if arguments don't matter)
+    const cacheKey = "fixed";
+
+    if (cache.has(cacheKey)) {
+      const { data, timestamp } = cache.get(cacheKey);
+      // Check if the cache is still valid
+      if (Date.now() - timestamp < ttl) {
+        console.log(`Returning cached data for key: ${cacheKey}`);
+        return data;
+      }
+    }
+
+    // If not cached or cache expired, call the original function
+    const result = await func(...args); // Use await if the wrapped function is async
+
+    // Store the new result in the cache with the current timestamp
+    cache.set(cacheKey, {
+      data: result,
+      timestamp: Date.now(),
+    });
+
+    return result;
+  };
+}
+
+export const fetchLocationsCached: (
+  payload: FetchLocationPayload
+) => Promise<PlacePin[]> = cacheFunctionCall(fetchLocations, 5000);

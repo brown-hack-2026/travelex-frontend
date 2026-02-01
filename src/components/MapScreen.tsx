@@ -7,7 +7,7 @@ import {
   startSession,
   endSession,
   uploadPhoto,
-  fetchLocations,
+  fetchLocationsCached,
 } from "@/lib/api";
 import TopBar from "@/components/TopBar";
 import SessionBar from "@/components/SessionBar";
@@ -286,7 +286,7 @@ export default function MapScreen() {
 
   async function loadPins(bypassId?: string) {
     if (!bypassId && session.status != "ACTIVE") return;
-    const newPins = await fetchLocations({
+    const newPins = await fetchLocationsCached({
       sessionId: session.status == "ACTIVE" ? session.sessionId : bypassId!,
       position: positionRef.current,
       headingNormalized: headingNormalizedRef.current,
@@ -348,7 +348,7 @@ export default function MapScreen() {
           if (value) chunks.push(value);
         }
         const audioData = new Uint8Array(
-          chunks.reduce((acc, value) => acc + value.length, 0),
+          chunks.reduce((acc, value) => acc + value.length, 0)
         );
         let offset = 0;
         for (const chunk of chunks) {
@@ -383,7 +383,7 @@ export default function MapScreen() {
       });
       playBufferedAudio();
     },
-    [playBufferedAudio],
+    [playBufferedAudio]
   );
 
   const cancelAudio = useCallback(() => {
@@ -476,7 +476,7 @@ export default function MapScreen() {
           headingCandidate = normalizeHeadingUnit(heading);
         } else if (lastPos && movedEnough) {
           headingCandidate = normalizeHeadingUnit(
-            calculateBearing(lastPos, nextPos),
+            calculateBearing(lastPos, nextPos)
           );
         } else if (
           !orientationAvailableRef.current &&
@@ -487,7 +487,7 @@ export default function MapScreen() {
 
         if (headingCandidate != null && !orientationAvailableRef.current) {
           setCurrentHeadingNormalized((prev) =>
-            prev === headingCandidate ? prev : headingCandidate,
+            prev === headingCandidate ? prev : headingCandidate
           );
           headingNormalizedRef.current = headingCandidate;
         }
@@ -502,7 +502,7 @@ export default function MapScreen() {
         enableHighAccuracy: true,
         maximumAge: 1_000,
         timeout: 10_000,
-      },
+      }
     );
     loadPins();
 
@@ -546,7 +546,7 @@ export default function MapScreen() {
       fallbackHeadingRef.current = normalized;
       headingNormalizedRef.current = normalized;
       setCurrentHeadingNormalized((prev) =>
-        prev === normalized ? prev : normalized,
+        prev === normalized ? prev : normalized
       );
     };
     window.addEventListener(orientationEventName, orientationHandler, true);
@@ -554,7 +554,7 @@ export default function MapScreen() {
       window.removeEventListener(
         orientationEventName,
         orientationHandler,
-        true,
+        true
       );
     };
   }, []);
@@ -573,7 +573,7 @@ export default function MapScreen() {
       setAudioSessionActive(true);
       lastSpokenHighlightRef.current = null;
       queueElevenLabsAudio(
-        "Spotlight audio stream initiated. Listening for upcoming pins.",
+        "Spotlight audio stream initiated. Listening for upcoming pins."
       );
     } else {
       setAudioSessionActive(false);
