@@ -242,10 +242,14 @@ export default function MapScreen() {
   async function onStart() {
     setBusy(true);
     try {
+      try {
+        await requestOrientationPermissionAndListen();
+      } catch (error) {
+        console.warn("Failed to initialize orientation listener", error);
+      }
       console.log(user);
       console.log(user?.email);
       const res = await startSession(user?.email ?? "");
-      await requestOrientationPermissionAndListen();
       // resetMockLocationFeed();
       setPins([]);
       setHighlightIndex(null);
