@@ -291,6 +291,7 @@ export default function MapScreen() {
 
   async function loadPins(bypassId?: string) {
     if (!bypassId && session.status != "ACTIVE") return;
+    console.log("LOADING PINS");
     const newPins = await fetchLocations({
       sessionId: session.status == "ACTIVE" ? session.sessionId : bypassId!,
       position: positionRef.current,
