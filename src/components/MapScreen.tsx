@@ -256,7 +256,7 @@ export default function MapScreen() {
         sessionId: res.sessionId,
         startedAt: res.startedAt,
       });
-      loadPins(res.sessionId);
+      // loadPins(res.sessionId);
     } finally {
       setBusy(false);
     }
