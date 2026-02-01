@@ -61,6 +61,7 @@ export default function TripReportCard({
           stylers: [{ visibility: "off" }],
         },
       ],
+      
     });
 
     // Draw path polyline
