@@ -12,7 +12,7 @@ const elevenlabs = new ElevenLabsClient({
 
 export const createAudioStreamFromText = async (text: string) => {
   const audioStream = await elevenlabs.textToSpeech.stream(
-    "JBFqnCBsd6RMkjVDRZzb",
+    "pVnrL6sighQX7hVz89cp",
     {
       modelId: "eleven_multilingual_v2",
       text,

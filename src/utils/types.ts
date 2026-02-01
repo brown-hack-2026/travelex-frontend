@@ -3,3 +3,8 @@ export type BackendPayload = {
   route: string;
   payload: any;
 };
+
+export type GeoPoint = {
+  lat: number;
+  lng: number;
+};
