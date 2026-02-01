@@ -170,7 +170,7 @@ export default function TripReportCard({
         }}
       >
         {/* Stats Cards */}
-        <div className="flex content-between gap-3 pt-6">
+        <div className="grid grid-cols-3 gap-3 pt-6">
           <div
             className="rounded-lg p-4 text-center border"
             style={{
