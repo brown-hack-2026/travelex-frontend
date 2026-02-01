@@ -252,8 +252,7 @@ export default function TripReportCard({
         alert("Link copied to clipboard!");
       }
     } catch (error) {
-      console.error("Share failed:", error);
-      alert(`Share failed: ${error.message || "Unknown error"}`);
+      console.log("Share failed:", error);
     }
   };
 
