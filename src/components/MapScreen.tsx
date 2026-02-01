@@ -12,6 +12,7 @@ import TopBar from "@/components/TopBar";
 import SessionBar from "@/components/SessionBar";
 import PlaceSheet from "@/components/PlaceSheet";
 import WrappedPreview from "@/components/WrappedPreview";
+import MapView from "@/components/MapView";
 import { createAudioStreamFromText } from "@/utils/elevenlabs";
 import { useAtom } from "jotai";
 import { userAtom } from "@/utils/atom";
@@ -188,6 +189,7 @@ export default function MapScreen() {
   >(null);
   const [audioSessionActive, setAudioSessionActive] = useState(false);
   const [tourPrompt, setTourPrompt] = useState("");
+  const [viewMode, setViewMode] = useState<"list" | "map">("list");
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const lastRawPositionRef = useRef<GeoPoint | null>(null);
@@ -334,7 +336,7 @@ export default function MapScreen() {
           if (value) chunks.push(value);
         }
         const audioData = new Uint8Array(
-          chunks.reduce((acc, value) => acc + value.length, 0)
+          chunks.reduce((acc, value) => acc + value.length, 0),
         );
         let offset = 0;
         for (const chunk of chunks) {
@@ -369,7 +371,7 @@ export default function MapScreen() {
       });
       playBufferedAudio();
     },
-    [playBufferedAudio]
+    [playBufferedAudio],
   );
 
   const cancelAudio = useCallback(() => {
@@ -462,7 +464,7 @@ export default function MapScreen() {
           headingCandidate = normalizeHeadingUnit(heading);
         } else if (lastPos && movedEnough) {
           headingCandidate = normalizeHeadingUnit(
-            calculateBearing(lastPos, nextPos)
+            calculateBearing(lastPos, nextPos),
           );
         } else if (
           !orientationAvailableRef.current &&
@@ -473,7 +475,7 @@ export default function MapScreen() {
 
         if (headingCandidate != null && !orientationAvailableRef.current) {
           setCurrentHeadingNormalized((prev) =>
-            prev === headingCandidate ? prev : headingCandidate
+            prev === headingCandidate ? prev : headingCandidate,
           );
           headingNormalizedRef.current = headingCandidate;
         }
@@ -488,7 +490,7 @@ export default function MapScreen() {
         enableHighAccuracy: true,
         maximumAge: 1_000,
         timeout: 10_000,
-      }
+      },
     );
     loadPins();
 
@@ -532,7 +534,7 @@ export default function MapScreen() {
       fallbackHeadingRef.current = normalized;
       headingNormalizedRef.current = normalized;
       setCurrentHeadingNormalized((prev) =>
-        prev === normalized ? prev : normalized
+        prev === normalized ? prev : normalized,
       );
     };
     window.addEventListener(orientationEventName, orientationHandler, true);
@@ -540,7 +542,7 @@ export default function MapScreen() {
       window.removeEventListener(
         orientationEventName,
         orientationHandler,
-        true
+        true,
       );
     };
   }, []);
@@ -559,7 +561,7 @@ export default function MapScreen() {
       setAudioSessionActive(true);
       lastSpokenHighlightRef.current = null;
       queueElevenLabsAudio(
-        "Spotlight audio stream initiated. Listening for upcoming pins."
+        "Spotlight audio stream initiated. Listening for upcoming pins.",
       );
     } else {
       setAudioSessionActive(false);
@@ -597,13 +599,25 @@ export default function MapScreen() {
 
       <div className="relative h-dvh">
         <div className="absolute inset-0 bg-gradient-to-b from-neutral-900 to-neutral-950">
-          <div className="h-full w-full flex flex-col px-4 pb-32 pt-28 gap-4 overflow-y-auto">
+          <div className="h-full w-full flex flex-col px-4 pb-16 pt-28 gap-4 overflow-y-auto">
             <div className="space-y-2">
-              <div className="text-lg font-semibold">Location Pins</div>
+              <div className="flex items-center justify-between">
+                <div className="text-lg font-semibold">
+                  {viewMode === "list" ? "Location Pins" : "Map View"}
+                </div>
+                <button
+                  onClick={() =>
+                    setViewMode(viewMode === "list" ? "map" : "list")
+                  }
+                  className="rounded-2xl bg-white/10 border border-white/15 px-4 py-2 text-sm hover:bg-white/20 transition"
+                >
+                  {viewMode === "list" ? "Map View" : "List View"}
+                </button>
+              </div>
               <p className="text-sm text-neutral-300">
-                Session updates drop new pins every 30 seconds. Each pin stays
-                spotlighted until its audio narration completes, then the next
-                available pin takes over.
+                {viewMode === "list"
+                  ? "Session updates drop new pins every 30 seconds. Each pin stays spotlighted until its audio narration completes, then the next available pin takes over."
+                  : "Interactive map with clickable pin markers. Click a marker to view details."}
               </p>
             </div>
             <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
@@ -673,7 +687,17 @@ export default function MapScreen() {
                 orientation permissions.
               </p>
             </div>
-            {pins.length === 0 ? (
+            {viewMode === "map" ? (
+              <div className="h-[60vh] w-full rounded-3xl overflow-hidden border border-white/10">
+                <MapView
+                  pins={pins}
+                  highlightIndex={highlightIndex}
+                  selectedPin={selected}
+                  currentPosition={currentPosition}
+                  onPinClick={setSelected}
+                />
+              </div>
+            ) : pins.length === 0 ? (
               <div className="flex flex-1 items-center justify-center rounded-3xl border border-dashed border-white/20 p-8 text-center text-sm text-neutral-300">
                 Pins will appear once the active session begins streaming new
                 locations.
