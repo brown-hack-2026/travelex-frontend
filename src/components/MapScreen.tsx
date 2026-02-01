@@ -385,6 +385,9 @@ export default function MapScreen() {
       console.error("Failed to play audio chunk", error);
     } finally {
       processingAudioRef.current = false;
+      if (audioChunksQueueRef.current.length > 0) {
+        playBufferedAudio();
+      }
     }
   }, [ensureAudioContext]);
 
@@ -466,7 +469,6 @@ export default function MapScreen() {
 
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        toastify.info(`updated position ${pos.coords}`);
         const { latitude, longitude, heading, speed } = pos.coords;
         const nextPos: GeoPoint = { lat: latitude, lng: longitude };
         setCurrentPosition((prev) => {
