@@ -87,7 +87,6 @@ export default function MapView({
   }
 
   return (
-    
     <GoogleMap
       mapContainerStyle={{ height: "100%", width: "100%" }}
       center={center}
@@ -97,7 +96,8 @@ export default function MapView({
       {pins.map((pin, index) => {
         console.log("highlighted:", highlightIndex);
         const isSelected = selectedPin && pin.placeId === selectedPin.placeId;
-        const isHighlighted = highlightIndex !== null ? highlightIndex === index : false;
+        const isHighlighted =
+          highlightIndex !== null ? highlightIndex === index : false;
 
         let fillColor = "#10b981"; // default green
         let strokeWidth = 2;
@@ -116,7 +116,10 @@ export default function MapView({
         return (
           <Marker
             key={pin.placeId}
-            position={pin.}
+            position={{
+              lat: pin.location?.lat ?? 0,
+              lng: pin.location?.lon ?? 0,
+            }}
             onClick={() => handleMarkerClick(pin)}
             icon={{
               url:
@@ -124,7 +127,7 @@ export default function MapView({
                 encodeURIComponent(`
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="12" cy="12" r="10" fill="${fillColor}" stroke="#ffffff" stroke-width="${strokeWidth}"/>
-                    <text x="12" y="16" text-anchor="middle" fill="#ffffff" font-size="12" font-family="Arial">${pin.name.charAt(0)}</text>
+                    <text x="12" y="16" text-anchor="middle" fill="#ffffff" font-size="12" font-family="Arial">${pin.placeName.charAt(0)}</text>
                   </svg>
                 `),
               scaledSize: new google.maps.Size(size, size),

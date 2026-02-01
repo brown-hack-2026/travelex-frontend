@@ -534,7 +534,7 @@ export default function MapScreen() {
       fallbackHeadingRef.current = normalized;
       headingNormalizedRef.current = normalized;
       setCurrentHeadingNormalized((prev) =>
-        prev === normalized ? prev : normalized
+        prev === normalized ? prev : normalized,
       );
     };
     window.addEventListener(orientationEventName, orientationHandler, true);
@@ -687,7 +687,17 @@ export default function MapScreen() {
                 orientation permissions.
               </p>
             </div>
-            {pins.length === 0 ? (
+            {viewMode === "map" ? (
+              <div className="h-[60vh] w-full rounded-3xl overflow-hidden border border-white/10">
+                <MapView
+                  pins={pins}
+                  highlightIndex={highlightIndex}
+                  selectedPin={selected}
+                  currentPosition={currentPosition}
+                  onPinClick={setSelected}
+                />
+              </div>
+            ) : pins.length === 0 ? (
               <div className="flex flex-1 items-center justify-center rounded-3xl border border-dashed border-white/20 p-8 text-center text-sm text-neutral-300">
                 Pins will appear once the active session begins streaming new
                 locations.
