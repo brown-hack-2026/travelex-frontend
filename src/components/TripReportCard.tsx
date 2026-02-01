@@ -326,9 +326,9 @@ export default function TripReportCard({
           <button
             className="w-full rounded py-4 text-base font-normal transition-transform active:scale-[0.98] border"
             style={{
-              backgroundColor: "#0a0a0a",
-              color: "#a3a3a3",
-              borderColor: "#262626",
+              background: "linear-gradient(135deg, #262626 0%, #404040 100%)",
+              color: "#ffffff",
+              borderColor: "#525252",
             }}
             onClick={handleShare}
           >
