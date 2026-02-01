@@ -1,11 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, signInWithPopup, signOut, User } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  signInWithPopup,
+  signOut,
+  User,
+} from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
+import { useAtom } from "jotai";
+import { userAtom } from "@/utils/atom";
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useAtom(userAtom);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -30,7 +37,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         <div className="space-y-2">
           <div className="text-2xl font-semibold">Tour Guide</div>
           <div className="text-neutral-300 text-sm">
-            Tap places on the map, get audio guides, and generate a shareable recap.
+            Tap places on the map, get audio guides, and generate a shareable
+            recap.
           </div>
         </div>
 

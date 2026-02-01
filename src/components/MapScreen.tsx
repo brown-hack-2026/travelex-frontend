@@ -2,160 +2,130 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PlacePin } from "@/types/ui";
-import { startSession, endSession, uploadPhoto } from "@/lib/api";
+import {
+  startSession,
+  endSession,
+  uploadPhoto,
+  fetchLocations,
+} from "@/lib/api";
 import TopBar from "@/components/TopBar";
 import SessionBar from "@/components/SessionBar";
 import PlaceSheet from "@/components/PlaceSheet";
 import WrappedPreview from "@/components/WrappedPreview";
 import MapView from "@/components/MapView";
 import { createAudioStreamFromText } from "@/utils/elevenlabs";
-
-type GeoPoint = {
-  lat: number;
-  lng: number;
-};
+import { useAtom } from "jotai";
+import { userAtom } from "@/utils/atom";
+import { GeoPoint } from "@/utils/types";
 
 type AudioQueueItem = {
   text: string;
   onComplete?: () => void;
 };
 
-const MOCK_PIN_FEED: PlacePin[] = [
-  // {
-  //   id: "coffee-shop",
-  //   name: "Coffee Shop",
-  //   position: { lat: 0, lng: 0 },
-  //   category: "Food",
-  // },
-  // {
-  //   id: "museum",
-  //   name: "Museum",
-  //   position: { lat: 0, lng: 0 },
-  //   category: "Culture",
-  // },
-  // {
-  //   id: "viewpoint",
-  //   name: "Viewpoint",
-  //   position: { lat: 0, lng: 0 },
-  //   category: "Scenic",
-  // },
-  // {
-  //   id: "botanical",
-  //   name: "Botanical Garden",
-  //   position: { lat: 0, lng: 0 },
-  //   category: "Nature",
-  // },
-  // {
-  //   id: "market",
-  //   name: "Local Market",
-  //   position: { lat: 0, lng: 0 },
-  //   category: "Shopping",
-  // },
-  {
-    id: "brown-university-hall",
-    name: "University Hall (Brown University)",
-    position: { lat: 41.8268, lng: -71.4025 },
-    category: "Historic",
-  },
-  {
-    id: "brown-sci-library",
-    name: "Sciences Library (Brown University)",
-    position: { lat: 41.8263, lng: -71.4004 },
-    category: "Architecture",
-  },
-  {
-    id: "brown-granoff",
-    name: "Granoff Center for the Creative Arts (Brown University)",
-    position: { lat: 41.829, lng: -71.4027 },
-    category: "Arts",
-  },
-];
+// const MOCK_PIN_FEED: PlacePin[] = [
+//   {
+//     id: "coffee-shop",
+//     name: "Coffee Shop",
+//     position: { lat: 0, lng: 0 },
+//     category: "Food",
+//   },
+//   {
+//     id: "museum",
+//     name: "Museum",
+//     position: { lat: 0, lng: 0 },
+//     category: "Culture",
+//   },
+//   {
+//     id: "viewpoint",
+//     name: "Viewpoint",
+//     position: { lat: 0, lng: 0 },
+//     category: "Scenic",
+//   },
+//   {
+//     id: "botanical",
+//     name: "Botanical Garden",
+//     position: { lat: 0, lng: 0 },
+//     category: "Nature",
+//   },
+//   {
+//     id: "market",
+//     name: "Local Market",
+//     position: { lat: 0, lng: 0 },
+//     category: "Shopping",
+//   },
+//   {
+//     id: "brown-university-hall",
+//     name: "University Hall (Brown University)",
+//     position: { lat: 41.8268, lng: -71.4025 },
+//     category: "Historic",
+//   },
+//   {
+//     id: "brown-sci-library",
+//     name: "Sciences Library (Brown University)",
+//     position: { lat: 41.8263, lng: -71.4004 },
+//     category: "Architecture",
+//   },
+//   {
+//     id: "brown-granoff",
+//     name: "Granoff Center for the Creative Arts (Brown University)",
+//     position: { lat: 41.829, lng: -71.4027 },
+//     category: "Arts",
+//   },
+// ];
 
-const PIN_KEYWORDS: Record<string, string[]> = {
-  "coffee-shop": ["coffee", "latte", "cafe", "break"],
-  museum: ["museum", "culture", "art", "history"],
-  viewpoint: ["viewpoint", "scenic", "outlook", "sightseeing"],
-  botanical: ["garden", "nature", "plants"],
-  market: ["market", "shopping", "food"],
-  "brown-university-hall": [
-    "brown",
-    "university",
-    "building",
-    "buildings",
-    "sightseeing",
-    "historic",
-  ],
-  "brown-sci-library": [
-    "brown",
-    "university",
-    "building",
-    "buildings",
-    "library",
-    "sightseeing",
-  ],
-  "brown-granoff": [
-    "brown",
-    "university",
-    "building",
-    "buildings",
-    "arts",
-    "sightseeing",
-  ],
-};
+// const PIN_KEYWORDS: Record<string, string[]> = {
+//   "coffee-shop": ["coffee", "latte", "cafe", "break"],
+//   museum: ["museum", "culture", "art", "history"],
+//   viewpoint: ["viewpoint", "scenic", "outlook", "sightseeing"],
+//   botanical: ["garden", "nature", "plants"],
+//   market: ["market", "shopping", "food"],
+//   "brown-university-hall": [
+//     "brown",
+//     "university",
+//     "building",
+//     "buildings",
+//     "sightseeing",
+//     "historic",
+//   ],
+//   "brown-sci-library": [
+//     "brown",
+//     "university",
+//     "building",
+//     "buildings",
+//     "library",
+//     "sightseeing",
+//   ],
+//   "brown-granoff": [
+//     "brown",
+//     "university",
+//     "building",
+//     "buildings",
+//     "arts",
+//     "sightseeing",
+//   ],
+// };
 
-let mockFetchCursor = 0;
+// let mockFetchCursor = 0;
 
-type FetchLocationPayload = {
-  position: GeoPoint | null;
-  headingNormalized: number | null;
-  prompt: string;
-};
+// function filterPinsForPrompt(prompt: string) {
+//   const normalized = prompt.trim().toLowerCase();
+//   if (!normalized) return MOCK_PIN_FEED;
+//   const tokens = normalized.split(/\s+/).filter(Boolean);
+//   if (tokens.length === 0) return MOCK_PIN_FEED;
+//   const filtered = MOCK_PIN_FEED.filter((pin) => {
+//     const keywords = PIN_KEYWORDS[pin.id] ?? [];
+//     const haystack = `${pin.name} ${pin.category ?? ""} ${keywords.join(
+//       " "
+//     )}`.toLowerCase();
+//     return tokens.every((token) => haystack.includes(token));
+//   });
+//   return filtered.length > 0 ? filtered : MOCK_PIN_FEED;
+// }
 
-function filterPinsForPrompt(prompt: string) {
-  const normalized = prompt.trim().toLowerCase();
-  if (!normalized) return MOCK_PIN_FEED;
-  const tokens = normalized.split(/\s+/).filter(Boolean);
-  if (tokens.length === 0) return MOCK_PIN_FEED;
-  const filtered = MOCK_PIN_FEED.filter((pin) => {
-    const keywords = PIN_KEYWORDS[pin.id] ?? [];
-    const haystack = `${pin.name} ${pin.category ?? ""} ${keywords.join(
-      " ",
-    )}`.toLowerCase();
-    return tokens.every((token) => haystack.includes(token));
-  });
-  return filtered.length > 0 ? filtered : MOCK_PIN_FEED;
-}
-
-async function fetchLocations(
-  payload: FetchLocationPayload,
-): Promise<PlacePin[]> {
-  // await fetch("/api/backend", {
-  //   method: "POST",
-  //   body: JSON.stringify({
-  //     method: "POST",
-  //     route: "/v1/app/session/tracking",
-  //     payload: {
-  //       prompt: payload.prompt,
-  //       location: {
-  //         lon: payload.position?.lng,
-  //         lat: payload.position?.lat,
-  //       },
-  //       direction: payload.headingNormalized ?? 0,
-  //     },
-  //   }),
-  // }).catch((error) => {
-  //   console.warn("Failed to send tracking payload", error);
-  // });
-  const feed = filterPinsForPrompt(payload.prompt);
-  if (mockFetchCursor >= feed.length) return [];
-  const nextPins = feed.slice(mockFetchCursor, mockFetchCursor + 5);
-  mockFetchCursor += nextPins.length;
-  return nextPins;
-}
-
-function resetMockLocationFeed() {
-  mockFetchCursor = 0;
-}
+// function resetMockLocationFeed() {
+//   mockFetchCursor = 0;
+// }
 
 type SessionState =
   | { status: "IDLE" }
@@ -205,6 +175,7 @@ function calculateBearing(from: GeoPoint, to: GeoPoint) {
 }
 
 export default function MapScreen() {
+  const [user] = useAtom(userAtom);
   const [session, setSession] = useState<SessionState>({ status: "IDLE" });
   const [selected, setSelected] = useState<PlacePin | null>(null);
   const [busy, setBusy] = useState(false);
@@ -224,7 +195,7 @@ export default function MapScreen() {
   const fallbackHeadingRef = useRef<number | null>(null);
   const positionRef = useRef<GeoPoint | null>(null);
   const headingNormalizedRef = useRef<number | null>(null);
-  const headingSourceRef = useRef<"gps" | "motion">("motion");
+  const orientationAvailableRef = useRef(false);
   const lastSpokenHighlightRef = useRef<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
@@ -253,12 +224,14 @@ export default function MapScreen() {
   async function onStart() {
     setBusy(true);
     try {
-      const res = await startSession();
-      resetMockLocationFeed();
+      console.log(user);
+      console.log(user?.email);
+      const res = await startSession(user?.email ?? "");
+      // resetMockLocationFeed();
       setPins([]);
       setHighlightIndex(null);
       awaitingNextPinRef.current = false;
-      headingSourceRef.current = "motion";
+      orientationAvailableRef.current = false;
       setSession({
         status: "ACTIVE",
         sessionId: res.sessionId,
@@ -420,7 +393,9 @@ export default function MapScreen() {
     let cancelled = false;
 
     async function loadPins() {
+      if (session.status != "ACTIVE") return;
       const newPins = await fetchLocations({
+        sessionId: session.sessionId,
         position: positionRef.current,
         headingNormalized: headingNormalizedRef.current,
         prompt: tourPromptRef.current,
@@ -494,18 +469,18 @@ export default function MapScreen() {
           (speed ?? 0) > 1
         ) {
           headingCandidate = normalizeHeadingUnit(heading);
-          headingSourceRef.current = "gps";
         } else if (lastPos && movedEnough) {
           headingCandidate = normalizeHeadingUnit(
             calculateBearing(lastPos, nextPos),
           );
-          headingSourceRef.current = "gps";
-        } else if (fallbackHeadingRef.current != null) {
+        } else if (
+          !orientationAvailableRef.current &&
+          fallbackHeadingRef.current != null
+        ) {
           headingCandidate = fallbackHeadingRef.current;
-          headingSourceRef.current = "motion";
         }
 
-        if (headingCandidate != null) {
+        if (headingCandidate != null && !orientationAvailableRef.current) {
           setCurrentHeadingNormalized((prev) =>
             prev === headingCandidate ? prev : headingCandidate,
           );
@@ -560,13 +535,12 @@ export default function MapScreen() {
       const event = rawEvent as DeviceOrientationEvent;
       if (typeof event.alpha !== "number") return;
       const normalized = normalizeHeadingUnit(event.alpha);
+      orientationAvailableRef.current = true;
       fallbackHeadingRef.current = normalized;
-      if (headingSourceRef.current !== "gps") {
-        headingNormalizedRef.current = normalized;
-        setCurrentHeadingNormalized((prev) =>
-          prev === normalized ? prev : normalized,
-        );
-      }
+      headingNormalizedRef.current = normalized;
+      setCurrentHeadingNormalized((prev) =>
+        prev === normalized ? prev : normalized
+      );
     };
     window.addEventListener(orientationEventName, orientationHandler, true);
     tearDownOrientationListener.current = () => {
@@ -608,27 +582,13 @@ export default function MapScreen() {
     const pin = pins[highlightIndex];
     if (!pin) return;
 
-    const highlightToken = `${session.status}-${pin.id}-${highlightIndex}`;
+    const highlightToken = `${session.status}-${pin.placeId}-${highlightIndex}`;
     if (lastSpokenHighlightRef.current === highlightToken) return;
     lastSpokenHighlightRef.current = highlightToken;
 
-    const lat = positionRef.current
-      ? positionRef.current.lat.toFixed(3)
-      : "unknown latitude";
-    const lng = positionRef.current
-      ? positionRef.current.lng.toFixed(3)
-      : "unknown longitude";
-    const headingDegrees =
-      headingNormalizedRef.current != null
-        ? `${Math.round(headingNormalizedRef.current * 360)} degrees`
-        : "unknown heading";
-
-    queueElevenLabsAudio(
-      `Spotlight now on ${pin.name}. Heading ${headingDegrees}. Approximate location latitude ${lat} and longitude ${lng}.`,
-      {
-        onComplete: () => handleHighlightAudioComplete(highlightIndex),
-      },
-    );
+    queueElevenLabsAudio(pin.script, {
+      onComplete: () => handleHighlightAudioComplete(highlightIndex),
+    });
   }, [
     audioSessionActive,
     sessionActive,
@@ -732,54 +692,36 @@ export default function MapScreen() {
                 orientation permissions.
               </p>
             </div>
-            {viewMode === "list" ? (
-              <>
-                {pins.length === 0 ? (
-                  <div className="flex flex-1 items-center justify-center rounded-3xl border border-dashed border-white/20 p-8 text-center text-sm text-neutral-300">
-                    Pins will appear once the active session begins streaming
-                    new locations.
-                  </div>
-                ) : (
-                  <div className="grid gap-3">
-                    {pins.map((p, index) => {
-                      const isHighlighted =
-                        highlightIndex === index && sessionActive;
-                      return (
-                        <button
-                          key={p.id}
-                          onClick={() => setSelected(p)}
-                          className={`rounded-2xl px-4 py-4 text-left transition ${
-                            isHighlighted
-                              ? "bg-emerald-500/20 border border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.35)]"
-                              : "bg-white/5 border border-white/10 hover:bg-white/10"
-                          }`}
-                        >
-                          <div className="text-sm font-medium">{p.name}</div>
-                          <div className="text-xs text-neutral-300">
-                            {p.category ?? "Place"}
-                          </div>
-                          {isHighlighted && (
-                            <div className="mt-2 text-xs font-semibold text-emerald-300">
-                              Currently spotlighted
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
+            {pins.length === 0 ? (
+              <div className="flex flex-1 items-center justify-center rounded-3xl border border-dashed border-white/20 p-8 text-center text-sm text-neutral-300">
+                Pins will appear once the active session begins streaming new
+                locations.
+              </div>
             ) : (
-              <div
-                className="rounded-3xl border border-white/10 bg-white/[0.02] overflow-hidden h-full"
-              >
-                <MapView
-                  pins={pins}
-                  highlightIndex={highlightIndex}
-                  selectedPin={selected}
-                  currentPosition={currentPosition}
-                  onPinClick={setSelected}
-                />
+              <div className="grid gap-3">
+                {pins.map((p, index) => {
+                  const isHighlighted =
+                    highlightIndex === index && sessionActive;
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => setSelected(p)}
+                      className={`rounded-2xl px-4 py-4 text-left transition ${
+                        isHighlighted
+                          ? "bg-emerald-500/20 border border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.35)]"
+                          : "bg-white/5 border border-white/10 hover:bg-white/10"
+                      }`}
+                    >
+                      <div className="text-sm font-medium">{p.location}</div>
+                      <div className="text-xs text-neutral-300">Place</div>
+                      {isHighlighted && (
+                        <div className="mt-2 text-xs font-semibold text-emerald-300">
+                          Currently spotlighted
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

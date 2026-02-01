@@ -96,7 +96,7 @@ export default function MapView({
     >
       {pins.map((pin, index) => {
         console.log("highlighted:", highlightIndex);
-        const isSelected = selectedPin && pin.id === selectedPin.id;
+        const isSelected = selectedPin && pin.placeId === selectedPin.placeId;
         const isHighlighted = highlightIndex !== null ? highlightIndex === index : false;
 
         let fillColor = "#10b981"; // default green
@@ -115,8 +115,8 @@ export default function MapView({
 
         return (
           <Marker
-            key={pin.id}
-            position={pin.position}
+            key={pin.placeId}
+            position={pin.}
             onClick={() => handleMarkerClick(pin)}
             icon={{
               url:
