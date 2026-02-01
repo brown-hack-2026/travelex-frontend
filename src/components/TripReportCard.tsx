@@ -6,7 +6,6 @@ import {
   GOOGLE_MAPS_API_KEY,
   useGoogleMapsLoader,
 } from "@/hooks/useGoogleMapsLoader";
-import html2canvas from "html2canvas";
 
 type TripPhoto = {
   id: string;
@@ -30,10 +29,7 @@ export default function TripReportCard({
   onClose,
 }: TripReportCardProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const shareableRef = useRef<HTMLDivElement>(null);
-  const buttonsRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
   const { isLoaded: isMapsApiLoaded, loadError } = useGoogleMapsLoader();
   const hasApiKey = Boolean(GOOGLE_MAPS_API_KEY);
 
@@ -121,93 +117,6 @@ export default function TripReportCard({
     setMap(newMap);
   }, [pathPoints, locations, map, isMapsApiLoaded]);
 
-  const generateImage = async (options?: { hideButtons?: boolean }) => {
-    if (!shareableRef.current) return null;
-
-    setIsGenerating(true);
-
-    const shouldHideButtons = options?.hideButtons === true;
-    if (shouldHideButtons && buttonsRef.current) {
-      buttonsRef.current.style.display = "none";
-    }
-
-    // Wait for rendering
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    try {
-      const canvas = await html2canvas(shareableRef.current, {
-        backgroundColor: "#000000",
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        onclone: (doc) => {
-          const style = doc.createElement("style");
-          style.textContent = `
-            [data-shareable-content], [data-shareable-content] * {
-              background: #000000 !important;
-              background-image: none !important;
-              color: #e5e5e5 !important;
-              border-color: #333333 !important;
-              box-shadow: none !important;
-              text-shadow: none !important;
-              filter: none !important;
-            }
-          `;
-          doc.head.appendChild(style);
-        },
-      });
-
-      return canvas.toDataURL("image/png");
-    } catch (error) {
-      console.error("Failed to generate image:", error);
-      alert(
-        `Failed to generate image: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`,
-      );
-      return null;
-    } finally {
-      if (shouldHideButtons && buttonsRef.current) {
-        buttonsRef.current.style.display = "block";
-      }
-      setIsGenerating(false);
-    }
-  };
-
-  // const handleDownload = async () => {
-  //   const imageDataUrl = await generateImage({ hideButtons: true });
-  //   if (!imageDataUrl) return;
-
-  //   const blob = await (await fetch(imageDataUrl)).blob();
-  //   const file = new File(
-  //     [blob],
-  //     `trip-recap-${tripRecord.sessionId}-${Date.now()}.png`,
-  //     { type: "image/png" },
-  //   );
-
-  //   // Try to share/save to photos on mobile
-  //   if (navigator.share && navigator.canShare?.({ files: [file] })) {
-  //     try {
-  //       await navigator.share({
-  //         title: "Trip Recap",
-  //         text: "My travel journey recap",
-  //         files: [file],
-  //       });
-  //       return;
-  //     } catch (error) {
-  //       console.log("Share failed, falling back to download");
-  //     }
-  //   }
-
-  //   // Fallback: download link
-  //   const link = document.createElement("a");
-  //   link.download = `trip-recap-${tripRecord.sessionId}-${Date.now()}.png`;
-  //   link.href = URL.createObjectURL(blob);
-  //   link.click();
-  //   URL.revokeObjectURL(link.href);
-  // };
-
   const handleShare = async () => {
     const shareUrl = `${window.location.origin}/trip_record?sessionId=${tripRecord.sessionId}`;
 
@@ -226,47 +135,6 @@ export default function TripReportCard({
       // User cancel throws on iOS — not actually an error
       console.log("Share dismissed or failed:", error);
     }
-  };
-
-  const handleDownload = async () => {
-    const imageDataUrl = await generateImage({ hideButtons: true });
-    if (!imageDataUrl) return;
-
-    const blob = await (await fetch(imageDataUrl)).blob();
-    const filename = `trip-recap-${tripRecord.sessionId}-${Date.now()}.png`;
-    const file = new File([blob], filename, { type: "image/png" });
-
-    // Prefer native share sheet (best chance to "Save Image" on mobile)
-    const canNativeShare =
-      typeof navigator !== "undefined" &&
-      "share" in navigator &&
-      // canShare is required for files on some browsers
-      (!!navigator.canShare ? navigator.canShare({ files: [file] }) : true);
-
-    if (canNativeShare) {
-      try {
-        await navigator.share({
-          title: "Trip Recap",
-          text: "Save or share your trip recap",
-          files: [file],
-        });
-        return;
-      } catch (err) {
-        // User cancellation is not really an error; just fall back quietly.
-        // Some browsers throw AbortError on cancel.
-        console.log("Share aborted/failed, falling back to download:", err);
-      }
-    }
-
-    // Fallback: download (iOS often saves to Files; user can then Save Image)
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
   };
 
   // Calculate total distance (mock - replace with actual calculation)
@@ -295,8 +163,6 @@ export default function TripReportCard({
       </div>
 
       <div
-        ref={shareableRef}
-        data-shareable-content
         className="px-6 pb-8 space-y-8"
         style={{
           background:
@@ -304,7 +170,7 @@ export default function TripReportCard({
         }}
       >
         {/* Stats Cards */}
-        <div className="grid grid-cols-3 gap-3 pt-6">
+        <div className="flex content-between gap-3 pt-6">
           <div
             className="rounded-lg p-4 text-center border"
             style={{
@@ -313,10 +179,14 @@ export default function TripReportCard({
             }}
           >
             <div className="text-3xl font-light text-white">
-              {photos.length}
+              {(
+                (tripRecord.endedAt - tripRecord.startedAt) /
+                1000 /
+                60
+              ).toFixed(2)}
             </div>
             <div className="text-xs font-normal mt-1 text-neutral-400">
-              PLACES
+              Duration (min)
             </div>
           </div>
           <div
@@ -452,29 +322,15 @@ export default function TripReportCard({
         </div>
 
         {/* Action Buttons */}
-        <div ref={buttonsRef} className="space-y-3 pb-4">
+        <div className="space-y-3 pb-4">
           <button
-            className="w-full rounded py-4 text-base font-normal transition-transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed border"
-            style={{
-              background: "linear-gradient(135deg, #262626 0%, #404040 100%)",
-              color: "#ffffff",
-              borderColor: "#525252",
-            }}
-            onClick={handleDownload}
-            disabled={isGenerating}
-          >
-            {isGenerating ? "GENERATING..." : "DOWNLOAD RECAP"}
-          </button>
-
-          <button
-            className="w-full rounded py-4 text-base font-normal transition-transform active:scale-[0.98] disabled:opacity-50 border"
+            className="w-full rounded py-4 text-base font-normal transition-transform active:scale-[0.98] border"
             style={{
               backgroundColor: "#0a0a0a",
               color: "#a3a3a3",
               borderColor: "#262626",
             }}
             onClick={handleShare}
-            disabled={isGenerating}
           >
             SHARE JOURNEY
           </button>
