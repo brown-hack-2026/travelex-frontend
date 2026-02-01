@@ -7,6 +7,7 @@ import TopBar from "@/components/TopBar";
 import SessionBar from "@/components/SessionBar";
 import PlaceSheet from "@/components/PlaceSheet";
 import WrappedPreview from "@/components/WrappedPreview";
+import MapView from "@/components/MapView";
 import { createAudioStreamFromText } from "@/utils/elevenlabs";
 
 type GeoPoint = {
@@ -20,36 +21,36 @@ type AudioQueueItem = {
 };
 
 const MOCK_PIN_FEED: PlacePin[] = [
-  {
-    id: "coffee-shop",
-    name: "Coffee Shop",
-    position: { lat: 0, lng: 0 },
-    category: "Food",
-  },
-  {
-    id: "museum",
-    name: "Museum",
-    position: { lat: 0, lng: 0 },
-    category: "Culture",
-  },
-  {
-    id: "viewpoint",
-    name: "Viewpoint",
-    position: { lat: 0, lng: 0 },
-    category: "Scenic",
-  },
-  {
-    id: "botanical",
-    name: "Botanical Garden",
-    position: { lat: 0, lng: 0 },
-    category: "Nature",
-  },
-  {
-    id: "market",
-    name: "Local Market",
-    position: { lat: 0, lng: 0 },
-    category: "Shopping",
-  },
+  // {
+  //   id: "coffee-shop",
+  //   name: "Coffee Shop",
+  //   position: { lat: 0, lng: 0 },
+  //   category: "Food",
+  // },
+  // {
+  //   id: "museum",
+  //   name: "Museum",
+  //   position: { lat: 0, lng: 0 },
+  //   category: "Culture",
+  // },
+  // {
+  //   id: "viewpoint",
+  //   name: "Viewpoint",
+  //   position: { lat: 0, lng: 0 },
+  //   category: "Scenic",
+  // },
+  // {
+  //   id: "botanical",
+  //   name: "Botanical Garden",
+  //   position: { lat: 0, lng: 0 },
+  //   category: "Nature",
+  // },
+  // {
+  //   id: "market",
+  //   name: "Local Market",
+  //   position: { lat: 0, lng: 0 },
+  //   category: "Shopping",
+  // },
   {
     id: "brown-university-hall",
     name: "University Hall (Brown University)",
@@ -118,7 +119,7 @@ function filterPinsForPrompt(prompt: string) {
   const filtered = MOCK_PIN_FEED.filter((pin) => {
     const keywords = PIN_KEYWORDS[pin.id] ?? [];
     const haystack = `${pin.name} ${pin.category ?? ""} ${keywords.join(
-      " "
+      " ",
     )}`.toLowerCase();
     return tokens.every((token) => haystack.includes(token));
   });
@@ -126,7 +127,7 @@ function filterPinsForPrompt(prompt: string) {
 }
 
 async function fetchLocations(
-  payload: FetchLocationPayload
+  payload: FetchLocationPayload,
 ): Promise<PlacePin[]> {
   // await fetch("/api/backend", {
   //   method: "POST",
@@ -216,6 +217,7 @@ export default function MapScreen() {
   >(null);
   const [audioSessionActive, setAudioSessionActive] = useState(false);
   const [tourPrompt, setTourPrompt] = useState("");
+  const [viewMode, setViewMode] = useState<"list" | "map">("list");
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const lastRawPositionRef = useRef<GeoPoint | null>(null);
@@ -342,7 +344,7 @@ export default function MapScreen() {
           if (value) chunks.push(value);
         }
         const audioData = new Uint8Array(
-          chunks.reduce((acc, value) => acc + value.length, 0)
+          chunks.reduce((acc, value) => acc + value.length, 0),
         );
         let offset = 0;
         for (const chunk of chunks) {
@@ -377,7 +379,7 @@ export default function MapScreen() {
       });
       playBufferedAudio();
     },
-    [playBufferedAudio]
+    [playBufferedAudio],
   );
 
   const cancelAudio = useCallback(() => {
@@ -495,7 +497,7 @@ export default function MapScreen() {
           headingSourceRef.current = "gps";
         } else if (lastPos && movedEnough) {
           headingCandidate = normalizeHeadingUnit(
-            calculateBearing(lastPos, nextPos)
+            calculateBearing(lastPos, nextPos),
           );
           headingSourceRef.current = "gps";
         } else if (fallbackHeadingRef.current != null) {
@@ -505,7 +507,7 @@ export default function MapScreen() {
 
         if (headingCandidate != null) {
           setCurrentHeadingNormalized((prev) =>
-            prev === headingCandidate ? prev : headingCandidate
+            prev === headingCandidate ? prev : headingCandidate,
           );
           headingNormalizedRef.current = headingCandidate;
         }
@@ -519,7 +521,7 @@ export default function MapScreen() {
         enableHighAccuracy: true,
         maximumAge: 1_000,
         timeout: 10_000,
-      }
+      },
     );
 
     return () => {
@@ -562,7 +564,7 @@ export default function MapScreen() {
       if (headingSourceRef.current !== "gps") {
         headingNormalizedRef.current = normalized;
         setCurrentHeadingNormalized((prev) =>
-          prev === normalized ? prev : normalized
+          prev === normalized ? prev : normalized,
         );
       }
     };
@@ -571,7 +573,7 @@ export default function MapScreen() {
       window.removeEventListener(
         orientationEventName,
         orientationHandler,
-        true
+        true,
       );
     };
   }, []);
@@ -590,7 +592,7 @@ export default function MapScreen() {
       setAudioSessionActive(true);
       lastSpokenHighlightRef.current = null;
       queueElevenLabsAudio(
-        "Spotlight audio stream initiated. Listening for upcoming pins."
+        "Spotlight audio stream initiated. Listening for upcoming pins.",
       );
     } else {
       setAudioSessionActive(false);
@@ -625,7 +627,7 @@ export default function MapScreen() {
       `Spotlight now on ${pin.name}. Heading ${headingDegrees}. Approximate location latitude ${lat} and longitude ${lng}.`,
       {
         onComplete: () => handleHighlightAudioComplete(highlightIndex),
-      }
+      },
     );
   }, [
     audioSessionActive,
@@ -644,11 +646,23 @@ export default function MapScreen() {
         <div className="absolute inset-0 bg-gradient-to-b from-neutral-900 to-neutral-950">
           <div className="h-full w-full flex flex-col px-4 pb-32 pt-28 gap-4 overflow-y-auto">
             <div className="space-y-2">
-              <div className="text-lg font-semibold">Location Pins</div>
+              <div className="flex items-center justify-between">
+                <div className="text-lg font-semibold">
+                  {viewMode === "list" ? "Location Pins" : "Map View"}
+                </div>
+                <button
+                  onClick={() =>
+                    setViewMode(viewMode === "list" ? "map" : "list")
+                  }
+                  className="rounded-2xl bg-white/10 border border-white/15 px-4 py-2 text-sm hover:bg-white/20 transition"
+                >
+                  {viewMode === "list" ? "Map View" : "List View"}
+                </button>
+              </div>
               <p className="text-sm text-neutral-300">
-                Session updates drop new pins every 30 seconds. Each pin stays
-                spotlighted until its audio narration completes, then the next
-                available pin takes over.
+                {viewMode === "list"
+                  ? "Session updates drop new pins every 30 seconds. Each pin stays spotlighted until its audio narration completes, then the next available pin takes over."
+                  : "Interactive map with clickable pin markers. Click a marker to view details."}
               </p>
             </div>
             <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
@@ -718,38 +732,55 @@ export default function MapScreen() {
                 orientation permissions.
               </p>
             </div>
-            {pins.length === 0 ? (
-              <div className="flex flex-1 items-center justify-center rounded-3xl border border-dashed border-white/20 p-8 text-center text-sm text-neutral-300">
-                Pins will appear once the active session begins streaming new
-                locations.
-              </div>
+            {viewMode === "list" ? (
+              <>
+                {pins.length === 0 ? (
+                  <div className="flex flex-1 items-center justify-center rounded-3xl border border-dashed border-white/20 p-8 text-center text-sm text-neutral-300">
+                    Pins will appear once the active session begins streaming
+                    new locations.
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {pins.map((p, index) => {
+                      const isHighlighted =
+                        highlightIndex === index && sessionActive;
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => setSelected(p)}
+                          className={`rounded-2xl px-4 py-4 text-left transition ${
+                            isHighlighted
+                              ? "bg-emerald-500/20 border border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.35)]"
+                              : "bg-white/5 border border-white/10 hover:bg-white/10"
+                          }`}
+                        >
+                          <div className="text-sm font-medium">{p.name}</div>
+                          <div className="text-xs text-neutral-300">
+                            {p.category ?? "Place"}
+                          </div>
+                          {isHighlighted && (
+                            <div className="mt-2 text-xs font-semibold text-emerald-300">
+                              Currently spotlighted
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="grid gap-3">
-                {pins.map((p, index) => {
-                  const isHighlighted =
-                    highlightIndex === index && sessionActive;
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => setSelected(p)}
-                      className={`rounded-2xl px-4 py-4 text-left transition ${
-                        isHighlighted
-                          ? "bg-emerald-500/20 border border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.35)]"
-                          : "bg-white/5 border border-white/10 hover:bg-white/10"
-                      }`}
-                    >
-                      <div className="text-sm font-medium">{p.name}</div>
-                      <div className="text-xs text-neutral-300">
-                        {p.category ?? "Place"}
-                      </div>
-                      {isHighlighted && (
-                        <div className="mt-2 text-xs font-semibold text-emerald-300">
-                          Currently spotlighted
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
+              <div
+                className="rounded-3xl border border-white/10 bg-white/[0.02] overflow-hidden"
+                style={{ height: "60vh" }}
+              >
+                <MapView
+                  pins={pins}
+                  highlightPin={highlightIndex ? pins[highlightIndex] : null}
+                  selectedPin={selected}
+                  currentPosition={currentPosition}
+                  onPinClick={setSelected}
+                />
               </div>
             )}
           </div>
