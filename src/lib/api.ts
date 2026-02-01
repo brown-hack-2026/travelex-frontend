@@ -1,3 +1,38 @@
+// Trip record types
+export type TripPhoto = {
+  sessionId: string;
+  photoId: string;
+  placeId: string;
+  s3Key: string;
+  uploadedAt: number;
+  url: string;
+};
+
+export type TripLocation = {
+  location: {
+    location: {
+      lat: number;
+      lon: number;
+    };
+    name: string;
+    placeId: string;
+    placeName: string;
+    script: string;
+    types: string[];
+  };
+  photos: TripPhoto[];
+  timestamp: number;
+};
+
+export type TripRecord = {
+  sessionId: string;
+  startedAt: number;
+  endedAt: number;
+  user: string;
+  locationPhotoMap: {
+    [placeId: string]: TripLocation;
+  };
+};
 // src/lib/api.ts
 // Stub API functions for MapScreen usage
 import type { PlacePin } from "@/types/ui";
@@ -24,8 +59,8 @@ export async function startSession(user: string): Promise<{
 }
 
 export async function endSession(
-  sessionId: string
-): Promise<{ recapId: string }> {
+  sessionId: string,
+): Promise<{ sessionId: string }> {
   const res = await fetch("/api/backend", {
     method: "POST",
     body: JSON.stringify({
@@ -78,7 +113,7 @@ async function fetchLocations(
 export async function uploadPhoto(
   sessionId: string,
   place: PlacePin,
-  file: File
+  file: File,
 ): Promise<void> {
   // Convert file to base64 data URL
   const toBase64 = (file: File) =>
@@ -142,3 +177,20 @@ function cacheFunctionCall(func: (...args: any) => any, ttl: number) {
 export const fetchLocationsCached: (
   payload: FetchLocationPayload
 ) => Promise<PlacePin[]> = cacheFunctionCall(fetchLocations, 5000);
+
+export async function getTripData(sessionId: string): Promise<TripRecord> {
+  console.log("getTripData sessionId:", sessionId)
+  const res = await fetch("/api/backend", {
+    method: "POST",
+    body: JSON.stringify({
+      method: "POST",
+      route: "/v1/app/session/compiled",
+      payload: { sessionId },
+    }),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to fetch trip data");
+  }
+  return await res.json();
+}

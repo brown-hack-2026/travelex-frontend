@@ -132,7 +132,7 @@ type AudioQueueItem = {
 type SessionState =
   | { status: "IDLE" }
   | { status: "ACTIVE"; sessionId: string; startedAt: number }
-  | { status: "ENDED"; recapId: string };
+  | { status: "ENDED"; sessionId: string };
 
 const MOVEMENT_THRESHOLD_METERS = 3;
 const EARTH_RADIUS_METERS = 6_371_000;
@@ -261,7 +261,7 @@ export default function MapScreen() {
     setBusy(true);
     try {
       const res = await endSession(session.sessionId);
-      setSession({ status: "ENDED", recapId: res.recapId });
+      setSession({ status: "ENDED", sessionId: res.sessionId });
       setSelected(null);
     } finally {
       setBusy(false);
@@ -787,7 +787,7 @@ export default function MapScreen() {
         {session.status === "ENDED" && (
           <div className="absolute inset-x-0 bottom-0 z-30">
             <WrappedPreview
-              recapId={session.recapId}
+              sessionId={session.sessionId}
               onDismiss={() => setSession({ status: "IDLE" })}
             />
           </div>

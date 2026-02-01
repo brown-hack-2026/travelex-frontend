@@ -1,43 +1,47 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import TripReportCard from "@/components/TripReportCard";
 import { LoadScript } from "@react-google-maps/api";
+import { getTripData, TripRecord } from "@/lib/api";
 
 export default function TripRecordPage() {
-  // Mock data - replace with real data from your API/database
-  const mockPathPoints = [
-    { lat: 41.8268, lng: -71.4025 },
-    { lat: 41.827, lng: -71.402 },
-    { lat: 41.8263, lng: -71.4004 },
-    { lat: 41.829, lng: -71.4027 },
-  ];
+  const searchParams = useSearchParams();
+  const sessionId = searchParams.get("sessionId");
+  const [tripRecord, setTripRecord] = useState<TripRecord | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const mockPhotos = [
-    {
-      id: "1",
-      url: "/placeholder-photo.jpg",
-      placeName: "University Hall",
-      timestamp: new Date(),
-    },
-    {
-      id: "2",
-      url: "/placeholder-photo.jpg",
-      placeName: "Sciences Library",
-      timestamp: new Date(),
-    },
-  ];
+  useEffect(() => {
+    if (sessionId) {
+      getTripData(sessionId)
+        .then(setTripRecord)
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
+  }, [sessionId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-neutral-950 text-white flex items-center justify-center">
+        <div className="text-lg">Loading trip record...</div>
+      </div>
+    );
+  }
+
+  if (!tripRecord) {
+    return (
+      <div className="min-h-screen bg-neutral-950 text-white flex items-center justify-center">
+        <div className="text-lg">Trip record not found.</div>
+      </div>
+    );
+  }
 
   return (
-    <LoadScript
-      libraries={["places", "geometry", "drawing"]}
-      googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}
-    >
-      <TripReportCard
-        tripId="trip-123"
-        summaryImageUrl="/placeholder-summary.jpg"
-        pathPoints={mockPathPoints}
-        photos={mockPhotos}
-      />
-    </LoadScript>
+    
+      <TripReportCard tripRecord={tripRecord} />
+    
   );
 }

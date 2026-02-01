@@ -1,42 +1,49 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-
-type TripPhoto = {
-  id: string;
-  url: string;
-  placeName: string;
-  timestamp: Date;
-};
-
-type PathPoint = {
-  lat: number;
-  lng: number;
-};
+import { TripRecord } from "@/lib/api";
+import { LoadScript } from "@react-google-maps/api";
 
 type TripReportCardProps = {
-  tripId: string;
-  summaryImageUrl?: string;
-  pathPoints: PathPoint[];
-  photos: TripPhoto[];
+  tripRecord: TripRecord;
   onClose?: () => void;
 };
 
 export default function TripReportCard({
-  tripId,
-  summaryImageUrl,
-  pathPoints,
-  photos,
+  tripRecord,
   onClose,
 }: TripReportCardProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
+  // Derive data from tripRecord
+  const locations = Object.values(tripRecord.locationPhotoMap).sort(
+    (a, b) => a.timestamp - b.timestamp,
+  );
+  const pathPoints = locations.map((loc) => ({
+    lat: loc.location.location.lat,
+    lng: loc.location.location.lon,
+  }));
+  const photos = locations.flatMap((loc) =>
+    loc.photos.map((photo) => ({
+      id: photo.photoId,
+      url: photo.url,
+      placeName: loc.location.placeName,
+      timestamp: new Date(photo.uploadedAt),
+    })),
+  );
+
+  const tripDuration = tripRecord.endedAt - tripRecord.startedAt;
+  const durationText =
+    tripDuration > 60000
+      ? `${Math.floor(tripDuration / 60000)}m ${Math.floor((tripDuration % 60000) / 1000)}s`
+      : `${Math.floor(tripDuration / 1000)}s`;
+
   useEffect(() => {
     // Wait for Google Maps to load
     const checkGoogleMaps = () => {
-      if (typeof google !== 'undefined' && google.maps) {
+      if (typeof google !== "undefined" && google.maps) {
         setIsLoaded(true);
       } else {
         setTimeout(checkGoogleMaps, 100);
@@ -46,11 +53,11 @@ export default function TripReportCard({
   }, []);
 
   useEffect(() => {
-    if (!mapRef.current || map || !isLoaded) return;
+    if (!mapRef.current || map || !isLoaded || pathPoints.length === 0) return;
 
     // Initialize Google Map
     const newMap = new google.maps.Map(mapRef.current, {
-      center: pathPoints[0] || { lat: 0, lng: 0 },
+      center: pathPoints[0],
       zoom: 15,
       disableDefaultUI: true,
       gestureHandling: "none",
@@ -61,108 +68,127 @@ export default function TripReportCard({
           stylers: [{ visibility: "off" }],
         },
       ],
-      
     });
 
     // Draw path polyline
-    if (pathPoints.length > 0) {
-      new google.maps.Polyline({
-        path: pathPoints,
-        geodesic: true,
-        strokeColor: "#3B82F6",
-        strokeOpacity: 1.0,
-        strokeWeight: 4,
-        map: newMap,
-      });
+    new google.maps.Polyline({
+      path: pathPoints,
+      geodesic: true,
+      strokeColor: "#3B82F6",
+      strokeOpacity: 1.0,
+      strokeWeight: 4,
+      map: newMap,
+    });
 
-      // Fit bounds to path
-      const bounds = new google.maps.LatLngBounds();
-      pathPoints.forEach((point) => bounds.extend(point));
-      newMap.fitBounds(bounds);
-    }
+    // Add markers for each location
+    locations.forEach((loc) => {
+      new google.maps.Marker({
+        position: {
+          lat: loc.location.location.lat,
+          lng: loc.location.location.lon,
+        },
+        map: newMap,
+        title: loc.location.placeName,
+      });
+    });
+
+    // Fit bounds to path
+    const bounds = new google.maps.LatLngBounds();
+    pathPoints.forEach((point) => bounds.extend(point));
+    newMap.fitBounds(bounds);
 
     setMap(newMap);
-  }, [pathPoints, map, isLoaded]);
+  }, [pathPoints, locations, map, isLoaded]);
 
   return (
-    <div className="fixed inset-0 bg-black z-50 overflow-y-auto">
-      {/* Header */}
-      <div className="sticky top-0 bg-gradient-to-b from-black to-transparent z-10 p-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Your Trip Recap</h1>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="rounded-full p-2 bg-white/10 hover:bg-white/20"
-          >
-            ✕
-          </button>
-        )}
-      </div>
+    <LoadScript
+      libraries={["places", "geometry", "drawing"]}
+      googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}
+    >
+      <div className="fixed inset-0 bg-black z-50 overflow-y-auto">
+        {/* Header */}
+        <div className="sticky top-0 bg-gradient-to-b from-black to-transparent z-10 p-4 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold">Your Trip Recap</h1>
+            <p className="text-sm text-neutral-400">
+              {new Date(tripRecord.startedAt).toLocaleString()} - Duration:{" "}
+              {durationText}
+            </p>
+            <p className="text-sm text-neutral-400">User: {tripRecord.user}</p>
+          </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="rounded-full p-2 bg-white/10 hover:bg-white/20"
+            >
+              ✕
+            </button>
+          )}
+        </div>
 
-      <div className="px-4 pb-8 space-y-6">
-        {/* AI Summary Image */}
-        {summaryImageUrl && (
-          <div className="rounded-3xl overflow-hidden">
-            <img
-              src={summaryImageUrl}
-              alt="AI-generated trip summary"
-              className="w-full aspect-square object-cover"
+        <div className="px-4 pb-8 space-y-6">
+          {/* Map with Path */}
+          <div className="rounded-3xl overflow-hidden border border-white/10">
+            {!isLoaded && (
+              <div className="w-full h-[400px] bg-neutral-900 flex items-center justify-center">
+                <div className="text-neutral-400">Loading map...</div>
+              </div>
+            )}
+            <div
+              ref={mapRef}
+              className="w-full h-[400px] bg-neutral-900"
+              style={{ display: isLoaded ? "block" : "none" }}
             />
           </div>
-        )}
 
-        {/* Map with Path */}
-        <div className="rounded-3xl overflow-hidden border border-white/10">
-          {!isLoaded && (
-            <div className="w-full h-[400px] bg-neutral-900 flex items-center justify-center">
-              <div className="text-neutral-400">Loading map...</div>
-            </div>
-          )}
-          <div
-            ref={mapRef}
-            className="w-full h-[400px] bg-neutral-900"
-            style={{ display: isLoaded ? 'block' : 'none' }}
-          />
-        </div>
-
-        {/* Photos Grid */}
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Places You Visited</h2>
-          <div className="grid grid-cols-2 gap-3">
-            {photos.map((photo) => (
-              <div
-                key={photo.id}
-                className="rounded-2xl overflow-hidden bg-neutral-900 border border-white/10"
-              >
-                <img
-                  src={photo.url}
-                  alt={photo.placeName}
-                  className="w-full aspect-square object-cover"
-                />
-                <div className="p-3">
-                  <div className="text-sm font-medium">{photo.placeName}</div>
-                  <div className="text-xs text-neutral-400">
-                    {photo.timestamp.toLocaleTimeString()}
-                  </div>
+          {/* Places Visited */}
+          <div>
+            <h2 className="text-xl font-semibold mb-4">Places You Visited</h2>
+            <div className="space-y-4">
+              {locations.map((loc) => (
+                <div
+                  key={loc.location.placeId}
+                  className="rounded-2xl bg-white/5 border border-white/10 p-4"
+                >
+                  <h3 className="text-lg font-medium mb-2">
+                    {loc.location.placeName}
+                  </h3>
+                  <p className="text-sm text-neutral-300 mb-3">
+                    {loc.location.script}
+                  </p>
+                  {loc.photos.length > 0 && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {loc.photos.map((photo) => (
+                        <img
+                          key={photo.photoId}
+                          src={photo.url}
+                          alt={loc.location.placeName}
+                          className="rounded-lg w-full aspect-square object-cover"
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Share Button */}
-        <button
-          className="w-full rounded-full bg-white text-black font-semibold py-4 active:scale-[0.98]"
-          onClick={() => {
-            navigator.share?.({
-              title: "My Trip Recap",
-              text: `Check out my trip recap! Trip ID: ${tripId}`,
-            }).catch(() => {});
-          }}
-        >
-          Share Your Journey
-        </button>
+          {/* Share Button */}
+          <button
+            className="w-full rounded-full bg-white text-black font-semibold py-4 active:scale-[0.98]"
+            onClick={() => {
+              navigator
+                .share?.({
+                  title: "My Trip Recap",
+                  text: `Check out my trip recap! Session ID: ${tripRecord.sessionId}`,
+                })
+                .catch(() => {});
+            }}
+          >
+            Share Your Journey
+          </button>
+        </div>
       </div>
-    </div>
+    </LoadScript>
   );
 }

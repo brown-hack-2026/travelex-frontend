@@ -1,9 +1,8 @@
 "use client";
 
-type SessionState =
-  | { status: "IDLE" }
-  | { status: "ACTIVE"; sessionId: string; startedAt: number }
-  | { status: "ENDED"; recapId: string };
+import { SessionState } from "@/types/ui";
+
+
 
 export default function SessionBar({
   session,
