@@ -26,7 +26,7 @@ export default function PlaceSheet({
           <div className="p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-lg font-semibold">{place.location}</div>
+                <div className="text-lg font-semibold">{place.placeName}</div>
                 <div className="text-xs text-neutral-300">Place</div>
               </div>
               <button

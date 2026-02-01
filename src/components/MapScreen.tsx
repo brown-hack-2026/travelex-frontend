@@ -177,6 +177,7 @@ export default function MapScreen() {
   const [user] = useAtom(userAtom);
   const [session, setSession] = useState<SessionState>({ status: "IDLE" });
   const [selected, setSelected] = useState<PlacePin | null>(null);
+  const [seenPlaces, setSeenPlaces] = useState<{ [key: string]: string }>({});
   const [busy, setBusy] = useState(false);
   const [pins, setPins] = useState<PlacePin[]>([]);
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null);
@@ -235,6 +236,7 @@ export default function MapScreen() {
         sessionId: res.sessionId,
         startedAt: res.startedAt,
       });
+      loadPins(res.sessionId);
     } finally {
       setBusy(false);
     }
@@ -266,6 +268,23 @@ export default function MapScreen() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function loadPins(bypassId?: string) {
+    if (!bypassId && session.status != "ACTIVE") return;
+    const newPins = await fetchLocations({
+      sessionId: session.status == "ACTIVE" ? session.sessionId : bypassId!,
+      position: positionRef.current,
+      headingNormalized: headingNormalizedRef.current,
+      prompt: tourPromptRef.current,
+    });
+    if (newPins.length === 0) return;
+    const dedupPins = newPins.filter((pin) => !(pin.placeId in seenPlaces));
+    setPins((prev) => [...prev, ...dedupPins]);
+    setSeenPlaces({
+      ...seenPlaces,
+      ...Object.fromEntries(dedupPins.map((pin) => [pin.placeId, "exists"])),
+    });
   }
 
   useEffect(() => {
@@ -386,32 +405,6 @@ export default function MapScreen() {
   }, []);
 
   useEffect(() => {
-    if (!sessionActive) return;
-
-    let cancelled = false;
-
-    async function loadPins() {
-      if (session.status != "ACTIVE") return;
-      const newPins = await fetchLocations({
-        sessionId: session.sessionId,
-        position: positionRef.current,
-        headingNormalized: headingNormalizedRef.current,
-        prompt: tourPromptRef.current,
-      });
-      if (cancelled || newPins.length === 0) return;
-      setPins((prev) => [...prev, ...newPins]);
-    }
-
-    loadPins();
-    const intervalId = window.setInterval(loadPins, 30_000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, [sessionActive]);
-
-  useEffect(() => {
     if (!sessionActive) {
       awaitingNextPinRef.current = false;
       setHighlightIndex(null);
@@ -486,6 +479,7 @@ export default function MapScreen() {
         }
 
         lastRawPositionRef.current = nextPos;
+        loadPins();
       },
       (error) => {
         console.error("Failed to watch position", error);
@@ -496,6 +490,7 @@ export default function MapScreen() {
         timeout: 10_000,
       }
     );
+    loadPins();
 
     return () => {
       navigator.geolocation.clearWatch(watchId);
@@ -698,7 +693,7 @@ export default function MapScreen() {
                           : "bg-white/5 border border-white/10 hover:bg-white/10"
                       }`}
                     >
-                      <div className="text-sm font-medium">{p.location}</div>
+                      <div className="text-sm font-medium">{p.placeName}</div>
                       <div className="text-xs text-neutral-300">Place</div>
                       {isHighlighted && (
                         <div className="mt-2 text-xs font-semibold text-emerald-300">
