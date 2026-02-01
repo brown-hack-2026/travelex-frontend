@@ -210,49 +210,21 @@ export default function TripReportCard({
 
   const handleShare = async () => {
     const shareUrl = `${window.location.origin}/trip_record?sessionId=${tripRecord.sessionId}`;
-    const imageDataUrl = await generateImage({ hideButtons: false });
-
-    console.log("Sharing URL:", shareUrl);
-    console.log("Image data URL generated:", !!imageDataUrl);
 
     try {
-      if (navigator.share) {
-        const shareData: ShareData = {
+      if ("share" in navigator) {
+        await navigator.share({
           title: "My Travel Recap",
-          text: `Check out my adventure! ${photos.length} places visited.`,
+          text: `Check out my travel journey! ${photos.length} places visited.`,
           url: shareUrl,
-        };
-
-        if (imageDataUrl) {
-          const blob = await (await fetch(imageDataUrl)).blob();
-          const file = new File([blob], "trip-recap.png", {
-            type: "image/png",
-          });
-
-          console.log("File created:", file);
-          console.log(
-            "canShare files:",
-            navigator.canShare?.({ files: [file] }),
-          );
-
-          if (navigator.canShare?.({ files: [file] })) {
-            shareData.files = [file];
-            console.log("Files added to share data");
-          } else {
-            console.log("Files not supported, sharing URL only");
-          }
-        }
-
-        console.log("Calling navigator.share with:", shareData);
-        await navigator.share(shareData);
-        console.log("Share successful");
+        });
       } else {
-        console.log("navigator.share not available, copying to clipboard");
-        await navigator.clipboard.writeText(shareUrl);
+        await (navigator as any).clipboard.writeText(shareUrl);
         alert("Link copied to clipboard!");
       }
     } catch (error) {
-      console.log("Share failed:", error);
+      // User cancel throws on iOS — not actually an error
+      console.log("Share dismissed or failed:", error);
     }
   };
 
