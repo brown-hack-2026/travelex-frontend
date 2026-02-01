@@ -466,6 +466,7 @@ export default function MapScreen() {
 
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
+        toastify.info(`updated position ${pos.coords}`);
         const { latitude, longitude, heading, speed } = pos.coords;
         const nextPos: GeoPoint = { lat: latitude, lng: longitude };
         setCurrentPosition((prev) => {
@@ -508,7 +509,7 @@ export default function MapScreen() {
         lastRawPositionRef.current = nextPos;
       },
       (error) => {
-        console.error("Failed to watch position", error);
+        toastify.error(`Failed to watch position ${error}`);
       },
       {
         enableHighAccuracy: true,
